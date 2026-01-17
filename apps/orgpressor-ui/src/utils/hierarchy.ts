@@ -1,5 +1,74 @@
 import type { DataSet } from "vis-network/standalone";
-import type { VisNode, VisEdge } from "../types";
+import type { VisNode, VisEdge, HierarchyEdge } from "../types";
+
+/**
+ * Detects if the given edges form a cycle (not a valid DAG).
+ * Uses DFS with three states: unvisited (0), visiting (1), visited (2).
+ * A back edge to a "visiting" node indicates a cycle.
+ *
+ * @throws Error if a cycle is detected, with details about the cycle path
+ */
+export function validateNoCycles(edges: HierarchyEdge[]): void {
+  // Build adjacency list
+  const adjacency = new Map<string, string[]>();
+  const allNodes = new Set<string>();
+
+  for (const edge of edges) {
+    // Self-loop is a cycle
+    if (edge.from === edge.to) {
+      throw new Error(
+        `Cycle detected: node "${edge.from}" has a self-referencing edge`
+      );
+    }
+
+    allNodes.add(edge.from);
+    allNodes.add(edge.to);
+
+    if (!adjacency.has(edge.from)) {
+      adjacency.set(edge.from, []);
+    }
+    adjacency.get(edge.from)!.push(edge.to);
+  }
+
+  // DFS state: 0 = unvisited, 1 = visiting, 2 = visited
+  const state = new Map<string, number>();
+  const parent = new Map<string, string | null>();
+
+  function dfs(nodeId: string, path: string[]): void {
+    state.set(nodeId, 1); // Mark as visiting
+    path.push(nodeId);
+
+    const neighbors = adjacency.get(nodeId) || [];
+    for (const neighbor of neighbors) {
+      const neighborState = state.get(neighbor) || 0;
+
+      if (neighborState === 1) {
+        // Back edge found - cycle detected
+        // Find the cycle portion of the path
+        const cycleStart = path.indexOf(neighbor);
+        const cyclePath = [...path.slice(cycleStart), neighbor];
+        throw new Error(
+          `Cycle detected in hierarchy: ${cyclePath.join(" -> ")}`
+        );
+      }
+
+      if (neighborState === 0) {
+        parent.set(neighbor, nodeId);
+        dfs(neighbor, path);
+      }
+    }
+
+    path.pop();
+    state.set(nodeId, 2); // Mark as visited
+  }
+
+  // Run DFS from each unvisited node (handles disconnected components)
+  for (const nodeId of allNodes) {
+    if ((state.get(nodeId) || 0) === 0) {
+      dfs(nodeId, []);
+    }
+  }
+}
 
 /**
  * Get IDs of nodes that are part of the hierarchy (have edges or are roots)

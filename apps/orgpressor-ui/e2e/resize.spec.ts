@@ -1,13 +1,11 @@
 import { test } from "@playwright/test";
-import {
-  setupPage,
-  waitForStableLayout,
-  VIEWPORT,
-} from "./test-utils";
+import { OrgChartPage } from "./pages/OrgChartPage";
+import { VIEWPORT } from "./test-utils";
 
 test.describe("Resize Behavior", () => {
   test("root nodes stay in top bar after viewport height decrease", async ({ page }) => {
-    await setupPage(page);
+    const orgChart = new OrgChartPage(page);
+    await orgChart.goto();
 
     // Take initial snapshot
     await page.screenshot({ path: "test-results/resize-height-1-initial.png", fullPage: true });
@@ -18,7 +16,7 @@ test.describe("Resize Behavior", () => {
 
     // Wait for resize to be processed
     await page.waitForTimeout(100);
-    await waitForStableLayout(page, 500);
+    await orgChart.waitForStableLayout(500);
 
     // Take screenshot after resize
     await page.screenshot({ path: "test-results/resize-height-2-after-shrink.png", fullPage: true });
@@ -26,13 +24,14 @@ test.describe("Resize Behavior", () => {
     // Restore the viewport
     await page.setViewportSize(VIEWPORT);
     await page.waitForTimeout(100);
-    await waitForStableLayout(page, 500);
+    await orgChart.waitForStableLayout(500);
 
     await page.screenshot({ path: "test-results/resize-height-3-after-restore.png", fullPage: true });
   });
 
   test("root nodes stay in top bar after viewport width decrease", async ({ page }) => {
-    await setupPage(page);
+    const orgChart = new OrgChartPage(page);
+    await orgChart.goto();
 
     // Take initial snapshot
     await page.screenshot({ path: "test-results/resize-width-1-initial.png", fullPage: true });
@@ -43,7 +42,7 @@ test.describe("Resize Behavior", () => {
 
     // Wait for resize to be processed
     await page.waitForTimeout(100);
-    await waitForStableLayout(page, 500);
+    await orgChart.waitForStableLayout(500);
 
     // Take screenshot after resize
     await page.screenshot({ path: "test-results/resize-width-2-after-shrink.png", fullPage: true });
@@ -51,7 +50,7 @@ test.describe("Resize Behavior", () => {
     // Restore the viewport
     await page.setViewportSize(VIEWPORT);
     await page.waitForTimeout(100);
-    await waitForStableLayout(page, 500);
+    await orgChart.waitForStableLayout(500);
 
     await page.screenshot({ path: "test-results/resize-width-3-after-restore.png", fullPage: true });
   });

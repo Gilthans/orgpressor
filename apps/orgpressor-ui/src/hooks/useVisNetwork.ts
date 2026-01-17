@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Network, DataSet } from "vis-network/standalone";
 import type { Options } from "vis-network";
 import type { PersonNode, HierarchyEdge, VisNode, VisEdge } from "../types";
+import { validateNoCycles } from "../utils/hierarchy";
 
 interface UseVisNetworkProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -28,6 +29,9 @@ export function useVisNetwork({
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Validate that edges form a valid DAG (no cycles)
+    validateNoCycles(edges);
 
     // Initialize datasets
     const visNodes = new DataSet<VisNode>(

@@ -82,4 +82,93 @@ describe("useVisNetwork", () => {
 
     expect(networkInstance?.destroy).toHaveBeenCalled();
   });
+
+  describe("cycle detection", () => {
+    it("throws an error when edges form a simple cycle", () => {
+      const cyclicEdges = [
+        { from: "1", to: "2" },
+        { from: "2", to: "1" }, // Creates cycle: 1 -> 2 -> 1
+      ];
+
+      expect(() =>
+        renderHook(() =>
+          useVisNetwork({
+            containerRef: mockContainerRef,
+            nodes: mockNodes,
+            edges: cyclicEdges,
+            options: mockOptions,
+          })
+        )
+      ).toThrow(/cycle/i);
+    });
+
+    it("throws an error when edges form a longer cycle", () => {
+      const nodesForCycle = [
+        { id: "1", label: "Node 1" },
+        { id: "2", label: "Node 2" },
+        { id: "3", label: "Node 3" },
+      ];
+
+      const cyclicEdges = [
+        { from: "1", to: "2" },
+        { from: "2", to: "3" },
+        { from: "3", to: "1" }, // Creates cycle: 1 -> 2 -> 3 -> 1
+      ];
+
+      expect(() =>
+        renderHook(() =>
+          useVisNetwork({
+            containerRef: mockContainerRef,
+            nodes: nodesForCycle,
+            edges: cyclicEdges,
+            options: mockOptions,
+          })
+        )
+      ).toThrow(/cycle/i);
+    });
+
+    it("throws an error for self-referencing edge", () => {
+      const selfRefEdges = [
+        { from: "1", to: "1" }, // Self-loop
+      ];
+
+      expect(() =>
+        renderHook(() =>
+          useVisNetwork({
+            containerRef: mockContainerRef,
+            nodes: mockNodes,
+            edges: selfRefEdges,
+            options: mockOptions,
+          })
+        )
+      ).toThrow(/cycle/i);
+    });
+
+    it("does not throw for valid DAG edges", async () => {
+      const dagEdges = [
+        { from: "1", to: "2" },
+        { from: "1", to: "3" },
+        { from: "2", to: "3" }, // Diamond shape - valid DAG
+      ];
+
+      const nodesForDag = [
+        { id: "1", label: "Node 1" },
+        { id: "2", label: "Node 2" },
+        { id: "3", label: "Node 3" },
+      ];
+
+      const { result } = renderHook(() =>
+        useVisNetwork({
+          containerRef: mockContainerRef,
+          nodes: nodesForDag,
+          edges: dagEdges,
+          options: mockOptions,
+        })
+      );
+
+      await waitFor(() => {
+        expect(result.current.network).not.toBeNull();
+      });
+    });
+  });
 });
