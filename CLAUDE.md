@@ -10,7 +10,12 @@ A system that allows researchers to build and document organizational hierarchie
 
 - **Monorepo**: Turborepo with pnpm
 - **UI**: React + TypeScript + Vite
-- **Graph Visualization**: ReGraph v4.3.0 (required - integration constraint with existing system)
+- **Graph Visualization**: vis.js (POC) / ReGraph v4.3.0 (production - integration constraint)
+
+## Data
+
+- **POC**: Static JSON file with node labels
+- **Production**: Nodes loaded from integrated system, hierarchy persisted back
 
 ## Core Concepts
 
