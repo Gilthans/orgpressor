@@ -9,7 +9,8 @@ describe("useNodeDrag", () => {
   let mockNetwork: Network;
   let mockNodesDataSet: DataSet<VisNode>;
   let mockEdgesDataSet: DataSet<VisEdge>;
-  let eventHandlers: Record<string, Function>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let eventHandlers: Record<string, (...args: any[]) => void>;
   let allEdges: { id: string; from: string; to: string }[];
 
   const setupHook = () => {
@@ -76,7 +77,8 @@ describe("useNodeDrag", () => {
     allEdges = [{ id: "1-2", from: "1", to: "2" }];
 
     mockNetwork = {
-      on: vi.fn((event: string, handler: Function) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      on: vi.fn((event: string, handler: (...args: any[]) => void) => {
         eventHandlers[event] = handler;
       }),
       off: vi.fn(),
@@ -100,7 +102,8 @@ describe("useNodeDrag", () => {
     } as unknown as Network;
 
     mockNodesDataSet = {
-      get: vi.fn().mockImplementation((idOrFilter?: string | { filter: Function }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      get: vi.fn().mockImplementation((idOrFilter?: string | { filter: (item: any) => boolean }) => {
         if (idOrFilter === undefined) return allNodes;
         if (typeof idOrFilter === "string") {
           return allNodes.find((n) => n.id === idOrFilter) || null;
