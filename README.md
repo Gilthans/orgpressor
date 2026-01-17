@@ -59,7 +59,7 @@ The vis-network and vis-data libraries are externalized (not bundled) to avoid v
 
 ```tsx
 import { OrgGraph } from 'orgpressor-ui';
-import type { PersonNode, HierarchyEdge } from 'orgpressor-ui';
+import type { PersonNode, HierarchyEdge, GraphChangeData } from 'orgpressor-ui';
 
 const nodes: PersonNode[] = [
     { id: '1', label: 'Alice Chen' },
@@ -73,9 +73,14 @@ const edges: HierarchyEdge[] = [
 ];
 
 function App() {
+    const handleChange = (data: GraphChangeData) => {
+        console.log('Graph changed:', data);
+        // Persist to backend, update state, etc.
+    };
+
     return (
         <div style={{ width: '100%', height: '500px' }}>
-            <OrgGraph nodes={nodes} edges={edges} />
+            <OrgGraph nodes={nodes} edges={edges} onChange={handleChange} />
         </div>
     );
 }
@@ -91,8 +96,15 @@ Main component for rendering the organization chart.
 interface OrgGraphProps {
     nodes: PersonNode[];
     edges: HierarchyEdge[];
+    onChange?: (data: GraphChangeData) => void;
 }
 ```
+
+The `onChange` callback is called whenever the graph structure changes:
+- Node detached from parent (dragged out of hierarchy)
+- Node attached to new parent (dropped on another node)
+- Node made into root (dropped in top bar)
+- Node metadata edited (via double-click dialog)
 
 ### Types
 
@@ -110,6 +122,24 @@ interface HierarchyEdge {
 
 interface NodeMetadata {
     role?: string; // Displayed above the node label
+}
+
+// Data provided to onChange callback
+interface GraphChangeData {
+    nodes: OutputNode[];
+    edges: OutputEdge[];
+}
+
+interface OutputNode {
+    id: string;
+    name: string;
+    metadata?: NodeMetadata;
+    isRoot?: boolean;
+}
+
+interface OutputEdge {
+    from: string;
+    to: string;
 }
 ```
 

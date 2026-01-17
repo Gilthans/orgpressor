@@ -1,17 +1,19 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { formatNodeLabel, updateNode } from "../types";
-import type { PersonNode, HierarchyEdge, NodeMetadata } from "../types";
+import type { PersonNode, HierarchyEdge, NodeMetadata, GraphChangeData } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
+import { extractGraphState } from "../utils/graphState";
 import { TopBar } from "./TopBar";
 import { EditNodeDialog } from "./EditNodeDialog";
 
 interface OrgGraphProps {
   nodes: PersonNode[];
   edges: HierarchyEdge[];
+  onChange?: (data: GraphChangeData) => void;
 }
 
-export function OrgGraph({ nodes, edges }: OrgGraphProps) {
+export function OrgGraph({ nodes, edges, onChange }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -34,11 +36,18 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
     setIsTopBarHighlighted(highlighted);
   }, []);
 
+  const notifyChange = useCallback(() => {
+    if (onChange) {
+      onChange(extractGraphState(nodesDataSet, edgesDataSet));
+    }
+  }, [onChange, nodesDataSet, edgesDataSet]);
+
   useNodeDrag({
     network,
     nodesDataSet,
     edgesDataSet,
     onTopBarHighlight: handleTopBarHighlight,
+    onHierarchyChange: notifyChange,
   });
 
   useViewConstraints({ network, onScaleChange: setScale });
@@ -71,10 +80,11 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
             metadata,
           })
         );
+        notifyChange();
       }
       setEditingNodeId(null);
     },
-    [editingNodeId, nodesDataSet]
+    [editingNodeId, nodesDataSet, notifyChange]
   );
 
   const handleCancelEdit = useCallback(() => {

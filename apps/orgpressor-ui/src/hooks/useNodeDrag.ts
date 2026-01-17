@@ -35,6 +35,7 @@ interface UseNodeDragProps {
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
   onTopBarHighlight?: (highlighted: boolean) => void;
+  onHierarchyChange?: () => void;
 }
 
 // --- Highlight Helpers ---
@@ -181,6 +182,7 @@ export function useNodeDrag({
   nodesDataSet,
   edgesDataSet,
   onTopBarHighlight,
+  onHierarchyChange,
 }: UseNodeDragProps): void {
   const dragState = useRef<DragState | null>(null);
 
@@ -349,6 +351,9 @@ export function useNodeDrag({
           nodeY
         );
         nodesDataSet.update(subtreeUpdates);
+
+        // Notify that hierarchy changed (node disconnected)
+        onHierarchyChange?.();
       } else {
         // Rubber band effect - move entire subtree
         const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
@@ -399,6 +404,7 @@ export function useNodeDrag({
         handleSnapBack(nodesDataSet, dragState.current, currentPos.x);
       } else if (isOverTopBar) {
         handleCreateRoot(network, nodesDataSet, dragState.current);
+        onHierarchyChange?.();
       } else if (highlightedNodeId) {
         handleSnapToParent(
           network,
@@ -407,6 +413,7 @@ export function useNodeDrag({
           dragState.current,
           highlightedNodeId
         );
+        onHierarchyChange?.();
       }
 
       dragState.current = null;
@@ -421,5 +428,5 @@ export function useNodeDrag({
       network.off("dragging", handleDragging);
       network.off("dragEnd", handleDragEnd);
     };
-  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight]);
+  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight, onHierarchyChange]);
 }

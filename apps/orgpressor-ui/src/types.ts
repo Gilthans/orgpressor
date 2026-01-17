@@ -55,6 +55,33 @@ export interface VisEdge {
 }
 
 /**
+ * Output node data for onChange callback.
+ * Contains the essential data consumers need to persist.
+ */
+export interface OutputNode {
+  id: string;
+  name: string;
+  metadata?: NodeMetadata;
+  isRoot?: boolean;
+}
+
+/**
+ * Output edge data for onChange callback.
+ */
+export interface OutputEdge {
+  from: string;
+  to: string;
+}
+
+/**
+ * Data passed to the onChange callback when the graph state changes.
+ */
+export interface GraphChangeData {
+  nodes: OutputNode[];
+  edges: OutputEdge[];
+}
+
+/**
  * Represents a subtree: a node and all its descendants with their relative positions.
  * This is the core abstraction for moving nodes with their children.
  */
