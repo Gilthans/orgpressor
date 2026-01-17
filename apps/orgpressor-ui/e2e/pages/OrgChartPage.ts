@@ -1,27 +1,15 @@
 import { Page, Locator } from "@playwright/test";
 import { TOP_BAR_CENTER_Y, SNAP_OUT_THRESHOLD, VIEWPORT } from "../test-utils";
+import type { GraphAccessor, NodeStateInfo, EdgeStateInfo, Position } from "../../src/types";
 
-// =============================================================================
-// Types
-// =============================================================================
+// Re-export types from src for test convenience
+export type { Position, NodeStateInfo as NodeInfo, EdgeStateInfo as EdgeInfo };
 
-export interface Position {
-  x: number;
-  y: number;
-}
-
-export interface NodeInfo {
-  id: string;
-  label: string;
-  position: Position;
-  isRoot: boolean;
-}
-
-export interface EdgeInfo {
-  id: string;
-  from: string;
-  to: string;
-  dashes: boolean;
+// Declare the window extension for TypeScript
+declare global {
+  interface Window {
+    __GRAPH_ACCESSOR__?: GraphAccessor;
+  }
 }
 
 interface DragOptions {
@@ -55,59 +43,44 @@ export class OrgChartPage {
     await this.page.setViewportSize(VIEWPORT);
     await this.page.goto("/");
     await this.canvas.waitFor();
-    await this.waitForTestNetwork();
+    await this.waitForGraphAccessor();
     await this.waitForStableLayout();
   }
 
   /**
-   * Wait for the test network API to become available.
+   * Wait for the graph accessor API to become available.
    */
-  private async waitForTestNetwork(timeoutMs = 5000): Promise<void> {
+  private async waitForGraphAccessor(timeoutMs = 5000): Promise<void> {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
       const available = await this.page.evaluate(() => {
-        return typeof window.__TEST_NETWORK__ !== "undefined" &&
-               window.__TEST_NETWORK__?.network !== undefined;
+        return typeof window.__GRAPH_ACCESSOR__ !== "undefined";
       });
       if (available) return;
       await this.page.waitForTimeout(100);
     }
-    throw new Error("Test network not available after timeout");
+    throw new Error("Graph accessor not available after timeout");
   }
 
   // ===========================================================================
-  // Network Data Access (via exposed test API)
+  // Graph Data Access (via GraphAccessor API)
   // ===========================================================================
 
   /**
    * Get all node information including dynamically calculated positions.
    */
-  async getNodes(): Promise<NodeInfo[]> {
+  async getNodes(): Promise<NodeStateInfo[]> {
     return await this.page.evaluate(() => {
-      const testNetwork = window.__TEST_NETWORK__;
-      if (!testNetwork) throw new Error("Test network not available");
-
-      const { network, nodesDataSet } = testNetwork;
-      const nodes = nodesDataSet.get();
-      const positions = network.getPositions();
-
-      return nodes.map((node) => {
-        const canvasPos = positions[node.id] || { x: 0, y: 0 };
-        const domPos = network.canvasToDOM(canvasPos);
-        return {
-          id: node.id,
-          label: node.label,
-          position: { x: Math.round(domPos.x), y: Math.round(domPos.y) },
-          isRoot: node.isRoot || false,
-        };
-      });
+      const accessor = window.__GRAPH_ACCESSOR__;
+      if (!accessor) throw new Error("Graph accessor not available");
+      return accessor.getNodes();
     });
   }
 
   /**
    * Get a specific node's information by label.
    */
-  async getNode(label: string): Promise<NodeInfo | null> {
+  async getNode(label: string): Promise<NodeStateInfo | null> {
     const nodes = await this.getNodes();
     return nodes.find((n) => n.label === label) || null;
   }
@@ -124,18 +97,11 @@ export class OrgChartPage {
   /**
    * Get all edges with their styling information.
    */
-  async getEdges(): Promise<EdgeInfo[]> {
+  async getEdges(): Promise<EdgeStateInfo[]> {
     return await this.page.evaluate(() => {
-      const testNetwork = window.__TEST_NETWORK__;
-      if (!testNetwork) throw new Error("Test network not available");
-
-      const { edgesDataSet } = testNetwork;
-      return edgesDataSet.get().map((edge) => ({
-        id: edge.id,
-        from: edge.from,
-        to: edge.to,
-        dashes: edge.dashes || false,
-      }));
+      const accessor = window.__GRAPH_ACCESSOR__;
+      if (!accessor) throw new Error("Graph accessor not available");
+      return accessor.getEdges();
     });
   }
 
@@ -156,7 +122,7 @@ export class OrgChartPage {
   /**
    * Get children of a node.
    */
-  async getChildren(parentLabel: string): Promise<NodeInfo[]> {
+  async getChildren(parentLabel: string): Promise<NodeStateInfo[]> {
     const [parent, edges, nodes] = await Promise.all([
       this.getNode(parentLabel),
       this.getEdges(),
@@ -172,7 +138,7 @@ export class OrgChartPage {
   /**
    * Get root nodes.
    */
-  async getRootNodes(): Promise<NodeInfo[]> {
+  async getRootNodes(): Promise<NodeStateInfo[]> {
     const nodes = await this.getNodes();
     return nodes.filter((n) => n.isRoot);
   }
@@ -180,7 +146,7 @@ export class OrgChartPage {
   /**
    * Get free nodes (not connected to any hierarchy).
    */
-  async getFreeNodes(): Promise<NodeInfo[]> {
+  async getFreeNodes(): Promise<NodeStateInfo[]> {
     const [nodes, edges] = await Promise.all([this.getNodes(), this.getEdges()]);
 
     // A node is free if it has no parent edge and is not a root

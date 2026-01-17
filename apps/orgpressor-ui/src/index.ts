@@ -10,4 +10,8 @@ export type {
   OutputNode,
   OutputEdge,
   GraphChangeData,
+  Position,
+  NodeStateInfo,
+  EdgeStateInfo,
+  GraphAccessor,
 } from "./types";

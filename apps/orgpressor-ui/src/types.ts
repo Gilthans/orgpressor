@@ -101,3 +101,47 @@ export interface DragState {
   /** Offset between click point and node center (calculated on first drag event) */
   pointerOffset: { dx: number; dy: number } | null;
 }
+
+// =============================================================================
+// Graph Accessor API (for inspecting current graph state)
+// =============================================================================
+
+/**
+ * Position in DOM coordinates (pixels relative to viewport).
+ */
+export interface Position {
+  x: number;
+  y: number;
+}
+
+/**
+ * Node state info returned by GraphAccessor.
+ * Includes current DOM position for building overlays or integrations.
+ */
+export interface NodeStateInfo {
+  id: string;
+  label: string;
+  isRoot: boolean;
+  position: Position;
+}
+
+/**
+ * Edge state info returned by GraphAccessor.
+ */
+export interface EdgeStateInfo {
+  id: string;
+  from: string;
+  to: string;
+  dashes: boolean;
+}
+
+/**
+ * Accessor for querying the current graph state.
+ * Useful for building overlays, integrations, or inspecting the graph.
+ */
+export interface GraphAccessor {
+  /** Get all nodes with their current DOM positions. */
+  getNodes(): NodeStateInfo[];
+  /** Get all edges with their connection info. */
+  getEdges(): EdgeStateInfo[];
+}

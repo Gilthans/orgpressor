@@ -34,6 +34,7 @@ interface UseNodeDragProps {
   network: Network | null;
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
+  scale: number;
   onTopBarHighlight?: (highlighted: boolean) => void;
   onHierarchyChange?: () => void;
 }
@@ -181,6 +182,7 @@ export function useNodeDrag({
   network,
   nodesDataSet,
   edgesDataSet,
+  scale,
   onTopBarHighlight,
   onHierarchyChange,
 }: UseNodeDragProps): void {
@@ -220,13 +222,21 @@ export function useNodeDrag({
       const pointer = params.pointer.canvas;
       const { originalY, snappedOut } = dragState.current;
 
-      // Calculate pointer offset on first drag event (offset from node center to click point)
+      // On first drag event, capture the offset between pointer and node center
       if (dragState.current.pointerOffset === null) {
         const currentPos = network.getPositions([nodeId])[nodeId];
-        dragState.current.pointerOffset = {
-          dx: pointer.x - currentPos.x,
-          dy: pointer.y - currentPos.y,
-        };
+        let dx = pointer.x - currentPos.x;
+        let dy = pointer.y - currentPos.y;
+
+        // If offset is too large, the mouse likely moved before this event fired.
+        // In this case, assume the drag started from the node center.
+        const MAX_OFFSET = 20; // Reasonable offset for clicking on edge of node
+        if (Math.abs(dx) > MAX_OFFSET || Math.abs(dy) > MAX_OFFSET) {
+          dx = 0;
+          dy = 0;
+        }
+
+        dragState.current.pointerOffset = { dx, dy };
       }
 
       if (snappedOut) {
@@ -293,8 +303,10 @@ export function useNodeDrag({
       }
 
       // No node overlap - check if over top bar zone (use node position, not pointer)
+      // Account for view scale since TopBar height is scaled
       const domY = canvasToDOMY(network, nodeY);
-      const isOverTopBar = domY < TOP_BAR_HEIGHT;
+      const scaledTopBarHeight = TOP_BAR_HEIGHT * scale;
+      const isOverTopBar = domY < scaledTopBarHeight;
 
       if (isOverTopBar !== dragState.current!.isOverTopBar) {
         dragState.current!.isOverTopBar = isOverTopBar;
@@ -428,5 +440,5 @@ export function useNodeDrag({
       network.off("dragging", handleDragging);
       network.off("dragEnd", handleDragEnd);
     };
-  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight, onHierarchyChange]);
+  }, [network, nodesDataSet, edgesDataSet, scale, onTopBarHighlight, onHierarchyChange]);
 }
