@@ -1,5 +1,4 @@
-import type { Network } from "vis-network";
-import type { DataSet } from "vis-data";
+import type { Network, DataSet } from "vis-network/standalone";
 import { useRef, useState, useCallback, useEffect } from "react";
 import { formatNodeLabel, updateNode } from "../types";
 import type {
@@ -110,7 +109,12 @@ export function OrgGraph({
     onHierarchyChange: notifyChange,
   });
 
-  useViewConstraints({ network, onScaleChange: setScale });
+  useViewConstraints({
+    network,
+    nodesDataSet,
+    edgesDataSet,
+    onScaleChange: setScale,
+  });
 
   // Handle double-click to edit node metadata
   useEffect(() => {

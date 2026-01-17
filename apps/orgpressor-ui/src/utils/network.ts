@@ -24,7 +24,10 @@ export function canvasToDOMY(network: Network, canvasY: number): number {
  * Convert DOM Y coordinate (relative to container top) to canvas Y
  */
 export function domToCanvasY(network: Network, domY: number): number {
-  return network.DOMtoCanvas({ x: 0, y: domY }).y;
+  const container = getNetworkContainer(network);
+  const containerRect = container.getBoundingClientRect();
+  // DOMtoCanvas expects window-relative coordinates, so add container top
+  return network.DOMtoCanvas({ x: 0, y: domY + containerRect.top }).y;
 }
 
 /**
@@ -63,12 +66,21 @@ export function findRootNodesMinY(
 }
 
 /**
- * Position the view so that a given canvas Y coordinate appears at ROOT_Y_IN_TOP_BAR in DOM.
- * This is the core function for keeping roots visible in the top bar.
+ * Get the target DOM Y for root nodes based on current scale.
+ * The TopBar scales with zoom, so the root position should too.
+ */
+export function getScaledRootTargetY(network: Network): number {
+  const scale = network.getScale();
+  return ROOT_Y_IN_TOP_BAR * scale;
+}
+
+/**
+ * Position the view so that a given canvas Y coordinate appears at the scaled root target Y in DOM.
+ * This is the core function for keeping roots visible in the scaled top bar.
  *
  * The math: DOM_Y = containerHeight/2 + (canvasY - viewY) * scale
- * Solving for viewY when DOM_Y = ROOT_Y_IN_TOP_BAR:
- *   viewY = canvasY + (containerHeight/2 - ROOT_Y_IN_TOP_BAR) / scale
+ * Solving for viewY when DOM_Y = targetDomY:
+ *   viewY = canvasY + (containerHeight/2 - targetDomY) / scale
  */
 export function positionViewForTopY(
   network: Network,
@@ -80,7 +92,10 @@ export function positionViewForTopY(
   const scale = network.getScale();
   const currentPos = network.getViewPosition();
 
-  const viewY = topCanvasY + (containerHeight / 2 - ROOT_Y_IN_TOP_BAR) / scale;
+  // Target DOM Y scales with zoom to stay centered in the scaled TopBar
+  const targetDomY = ROOT_Y_IN_TOP_BAR * scale;
+
+  const viewY = topCanvasY + (containerHeight / 2 - targetDomY) / scale;
 
   network.moveTo({
     position: { x: currentPos.x, y: viewY },
@@ -90,7 +105,7 @@ export function positionViewForTopY(
 }
 
 /**
- * Position the view so root nodes appear at ROOT_Y_IN_TOP_BAR in DOM.
+ * Position the view so root nodes appear at the scaled root target Y in DOM.
  * Combines findRootNodesMinY and positionViewForTopY for convenience.
  */
 export function positionViewForRoots(
@@ -107,6 +122,7 @@ export function positionViewForRoots(
 
 /**
  * Check if roots are currently at the correct DOM Y position (within tolerance).
+ * The target Y is scaled to match the scaled TopBar.
  */
 export function areRootsAtCorrectPosition(
   network: Network,
@@ -120,7 +136,10 @@ export function areRootsAtCorrectPosition(
   // Calculate where minY currently appears in DOM coordinates
   const currentDomY = canvasToDOMY(network, minY);
 
-  return Math.abs(currentDomY - ROOT_Y_IN_TOP_BAR) <= tolerance;
+  // Target DOM Y scales with zoom
+  const targetDomY = getScaledRootTargetY(network);
+
+  return Math.abs(currentDomY - targetDomY) <= tolerance;
 }
 
 /**

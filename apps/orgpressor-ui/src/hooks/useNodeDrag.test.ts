@@ -19,6 +19,7 @@ describe("useNodeDrag", () => {
         network: mockNetwork,
         nodesDataSet: mockNodesDataSet,
         edgesDataSet: mockEdgesDataSet,
+        scale: 1,
       })
     );
   };
@@ -461,6 +462,7 @@ describe("useNodeDrag", () => {
           network: mockNetwork,
           nodesDataSet: mockNodesDataSet,
           edgesDataSet: mockEdgesDataSet,
+          scale: 1,
           onHierarchyChange,
         })
       );
@@ -503,6 +505,7 @@ describe("useNodeDrag", () => {
           network: mockNetwork,
           nodesDataSet: mockNodesDataSet,
           edgesDataSet: mockEdgesDataSet,
+          scale: 1,
           onHierarchyChange,
         })
       );
@@ -548,6 +551,7 @@ describe("useNodeDrag", () => {
           network: mockNetwork,
           nodesDataSet: mockNodesDataSet,
           edgesDataSet: mockEdgesDataSet,
+          scale: 1,
           onHierarchyChange,
         })
       );
