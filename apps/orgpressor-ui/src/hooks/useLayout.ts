@@ -5,17 +5,16 @@ import {
   FREE_NODES_TOP_MARGIN,
   FREE_NODES_SPACING,
   FREE_NODES_PER_ROW,
-  TOP_BAR_HEIGHT,
+  ROOT_Y_IN_TOP_BAR,
 } from "../config";
+import { getRootNodeIds } from "../utils/hierarchy";
+import { getNetworkContainer, domToCanvasY } from "../utils/network";
 
 interface UseLayoutProps {
   network: Network | null;
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
 }
-
-// Position roots centered vertically inside the top bar
-const ROOT_Y_IN_TOP_BAR = TOP_BAR_HEIGHT / 2;
 
 export function useLayout({
   network,
@@ -31,24 +30,23 @@ export function useLayout({
 
       // Find nodes that are part of the hierarchy (have edges)
       const connectedNodeIds = new Set<string>();
-      const childNodeIds = new Set<string>(); // Nodes that have a parent
+      const childNodeIds = new Set<string>();
       allEdges.forEach((edge) => {
         connectedNodeIds.add(edge.from);
         connectedNodeIds.add(edge.to);
-        childNodeIds.add(edge.to); // 'to' nodes have a parent
+        childNodeIds.add(edge.to);
       });
 
       // Identify root nodes (connected but not a child of anyone)
-      const rootNodeIds = new Set<string>();
-      connectedNodeIds.forEach((id) => {
-        if (!childNodeIds.has(id)) {
-          rootNodeIds.add(id);
-        }
-      });
+      const rootNodeIds = getRootNodeIds(edgesDataSet);
 
       // Separate free nodes from connected nodes
-      const freeNodes = allNodes.filter((node) => !connectedNodeIds.has(node.id) && !node.isRoot);
-      const connectedNodes = allNodes.filter((node) => connectedNodeIds.has(node.id) || node.isRoot);
+      const freeNodes = allNodes.filter(
+        (node) => !connectedNodeIds.has(node.id) && !node.isRoot
+      );
+      const connectedNodes = allNodes.filter(
+        (node) => connectedNodeIds.has(node.id) || node.isRoot
+      );
 
       if (connectedNodes.length === 0 && freeNodes.length === 0) return;
 
@@ -72,10 +70,11 @@ export function useLayout({
       if (hierarchyBottom === -Infinity) hierarchyBottom = 0;
 
       // Calculate how much to shift all nodes to put roots inside the top bar
-      const containerHeight = (network as unknown as { body: { container: HTMLElement } }).body.container.clientHeight;
+      const container = getNetworkContainer(network);
+      const containerHeight = container.clientHeight;
 
       // Target Y position for roots (in canvas coordinates) - centered in top bar
-      const targetRootY = network.DOMtoCanvas({ x: 0, y: ROOT_Y_IN_TOP_BAR }).y;
+      const targetRootY = domToCanvasY(network, ROOT_Y_IN_TOP_BAR);
       const yShift = targetRootY - hierarchyTop;
 
       // Shift all connected nodes and mark roots
@@ -90,7 +89,8 @@ export function useLayout({
       // Position free nodes in a grid below the shifted hierarchy
       const newHierarchyBottom = hierarchyBottom + yShift;
       const freeNodesStartY = newHierarchyBottom + FREE_NODES_TOP_MARGIN;
-      const totalWidth = (Math.min(freeNodes.length, FREE_NODES_PER_ROW) - 1) * FREE_NODES_SPACING;
+      const totalWidth =
+        (Math.min(freeNodes.length, FREE_NODES_PER_ROW) - 1) * FREE_NODES_SPACING;
       const startX = -totalWidth / 2;
 
       const freeUpdates: VisNode[] = freeNodes.map((node, index) => {
@@ -129,15 +129,12 @@ export function useLayout({
         });
 
         const centerX = (minX + maxX) / 2;
-        const containerWidth = (network as unknown as { body: { container: HTMLElement } }).body.container.clientWidth;
+        const containerWidth = container.clientWidth;
 
         // Calculate scale to fit width, but position so roots appear in top bar
         const newScale = Math.min(1, containerWidth / (maxX - minX + 200));
 
         // Position view so that minY (root level) appears at ROOT_Y_IN_TOP_BAR in DOM
-        // viewY is the canvas Y that appears at center of container
-        // We want minY to appear at ROOT_Y_IN_TOP_BAR from top
-        // So: minY should be at (containerHeight/2 - ROOT_Y_IN_TOP_BAR) pixels above center
         const viewY = minY + (containerHeight / 2 - ROOT_Y_IN_TOP_BAR) / newScale;
 
         network.moveTo({

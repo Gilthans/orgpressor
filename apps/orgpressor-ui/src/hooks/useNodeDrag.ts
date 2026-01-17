@@ -7,59 +7,22 @@ import {
   HIGHLIGHT_COLOR,
   DEFAULT_NODE_COLOR,
   TOP_BAR_HEIGHT,
-  networkOptions,
+  LEVEL_SEPARATION,
+  NODE_SPACING,
 } from "../config";
-
-// Get layout settings from config for positioning snapped nodes
-const hierarchicalConfig = networkOptions.layout?.hierarchical as { levelSeparation?: number; nodeSpacing?: number } | undefined;
-const LEVEL_SEPARATION = hierarchicalConfig?.levelSeparation ?? 100;
-const NODE_SPACING = hierarchicalConfig?.nodeSpacing ?? 150;
-
-// Check if two bounding boxes overlap
-function boxesOverlap(
-  a: { top: number; left: number; right: number; bottom: number },
-  b: { top: number; left: number; right: number; bottom: number }
-): boolean {
-  return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
-}
-
-// Get IDs of nodes that are part of the hierarchy (have edges or are roots)
-function getSnappedNodeIds(
-  nodesDataSet: DataSet<VisNode>,
-  edgesDataSet: DataSet<VisEdge>
-): Set<string> {
-  const snappedIds = new Set<string>();
-
-  // Add nodes with edges
-  edgesDataSet.get().forEach((edge) => {
-    snappedIds.add(edge.from);
-    snappedIds.add(edge.to);
-  });
-
-  // Add root nodes (even if they have no edges)
-  nodesDataSet.get().forEach((node) => {
-    if (node.isRoot) {
-      snappedIds.add(node.id);
-    }
-  });
-
-  return snappedIds;
-}
-
-// Check if a node is free (not part of hierarchy)
-function isNodeFree(
-  nodeId: string,
-  nodesDataSet: DataSet<VisNode>,
-  edgesDataSet: DataSet<VisEdge>
-): boolean {
-  const node = nodesDataSet.get(nodeId);
-  if (node?.isRoot) return false;
-
-  const connectedEdges = edgesDataSet.get({
-    filter: (edge) => edge.from === nodeId || edge.to === nodeId,
-  });
-  return connectedEdges.length === 0;
-}
+import {
+  getSnappedNodeIds,
+  isNodeFree,
+  getChildNodeIds,
+  getConnectedEdges,
+} from "../utils/hierarchy";
+import {
+  captureAllPositions,
+  findRightmostX,
+  createPositionUpdates,
+  boxesOverlap,
+} from "../utils/positions";
+import { canvasToDOMY, domToCanvasY } from "../utils/network";
 
 interface UseNodeDragProps {
   network: Network | null;
@@ -67,6 +30,119 @@ interface UseNodeDragProps {
   edgesDataSet: DataSet<VisEdge>;
   onTopBarHighlight?: (highlighted: boolean) => void;
 }
+
+// --- Highlight Helpers ---
+
+function setNodeHighlight(
+  nodesDataSet: DataSet<VisNode>,
+  nodeId: string,
+  color: { background: string; border: string }
+): void {
+  const node = nodesDataSet.get(nodeId);
+  if (node) {
+    nodesDataSet.update({
+      id: nodeId,
+      label: node.label,
+      color,
+    } as VisNode);
+  }
+}
+
+function resetNodeHighlight(nodesDataSet: DataSet<VisNode>, nodeId: string): void {
+  setNodeHighlight(nodesDataSet, nodeId, DEFAULT_NODE_COLOR);
+}
+
+// --- Drag End Handlers ---
+
+function handleSnapBack(
+  network: Network,
+  nodesDataSet: DataSet<VisNode>,
+  nodeId: string,
+  originalY: number
+): void {
+  const currentPos = network.getPositions([nodeId])[nodeId];
+  nodesDataSet.update({
+    id: nodeId,
+    label: nodesDataSet.get(nodeId)?.label || "",
+    x: currentPos.x,
+    y: originalY,
+  });
+}
+
+function handleCreateRoot(
+  network: Network,
+  nodesDataSet: DataSet<VisNode>,
+  nodeId: string
+): void {
+  const positions = captureAllPositions(network, nodesDataSet);
+  const existingRoots = nodesDataSet.get().filter((n) => n.isRoot);
+  const existingRootIds = existingRoots.map((r) => r.id);
+
+  // Calculate X position: to the right of existing roots
+  let newRootX = 0;
+  if (existingRoots.length > 0) {
+    newRootX = findRightmostX(existingRootIds, positions) + NODE_SPACING;
+  }
+
+  // Calculate Y position: same as existing roots, or centered in top bar
+  let rootY = 0;
+  if (existingRoots.length > 0) {
+    const firstRootPos = positions[existingRoots[0].id];
+    if (firstRootPos) {
+      rootY = firstRootPos.y;
+    }
+  } else {
+    rootY = domToCanvasY(network, TOP_BAR_HEIGHT / 2);
+  }
+
+  nodesDataSet.update({
+    id: nodeId,
+    label: nodesDataSet.get(nodeId)?.label || "",
+    x: newRootX,
+    y: rootY,
+    isRoot: true,
+  });
+}
+
+function handleSnapToParent(
+  network: Network,
+  nodesDataSet: DataSet<VisNode>,
+  edgesDataSet: DataSet<VisEdge>,
+  nodeId: string,
+  parentId: string
+): void {
+  const positions = captureAllPositions(network, nodesDataSet);
+  const parentPos = positions[parentId];
+
+  // Find existing children to position new child to their right
+  const existingChildIds = getChildNodeIds(parentId, edgesDataSet);
+  let newChildX = parentPos.x;
+  if (existingChildIds.length > 0) {
+    newChildX = findRightmostX(existingChildIds, positions) + NODE_SPACING;
+  }
+
+  // Add the edge
+  edgesDataSet.add({
+    id: `${parentId}-${nodeId}`,
+    from: parentId,
+    to: nodeId,
+  });
+
+  // Restore all existing node positions
+  const positionUpdates = createPositionUpdates(nodesDataSet, positions, [nodeId]);
+
+  // Position the newly snapped node below its parent
+  positionUpdates.push({
+    id: nodeId,
+    label: nodesDataSet.get(nodeId)?.label || "",
+    x: newChildX,
+    y: parentPos.y + LEVEL_SEPARATION,
+  });
+
+  nodesDataSet.update(positionUpdates);
+}
+
+// --- Main Hook ---
 
 export function useNodeDrag({
   network,
@@ -84,8 +160,6 @@ export function useNodeDrag({
 
       const nodeId = params.nodes[0] as string;
       const positions = network.getPositions([nodeId]);
-
-      // Check if node is free (no edges and not a root)
       const isFree = isNodeFree(nodeId, nodesDataSet, edgesDataSet);
 
       dragState.current = {
@@ -111,94 +185,80 @@ export function useNodeDrag({
       const { originalY, snappedOut } = dragState.current;
 
       if (snappedOut) {
-        // Node is snapped out - move freely
-        nodesDataSet.update({
-          id: nodeId,
-          label: nodesDataSet.get(nodeId)?.label || "",
-          x: pointer.x,
-          y: pointer.y,
-        });
+        handleFreeDragging(nodeId, pointer);
+      } else {
+        handleConnectedDragging(nodeId, pointer, originalY);
+      }
+    };
 
-        // Check for overlap with snapped nodes FIRST (takes priority over top bar)
-        const draggedBox = network.getBoundingBox(nodeId);
-        const snappedIds = getSnappedNodeIds(nodesDataSet, edgesDataSet);
-        let newHighlightedId: string | null = null;
+    const handleFreeDragging = (
+      nodeId: string,
+      pointer: { x: number; y: number }
+    ) => {
+      // Move node freely
+      nodesDataSet.update({
+        id: nodeId,
+        label: nodesDataSet.get(nodeId)?.label || "",
+        x: pointer.x,
+        y: pointer.y,
+      });
 
-        for (const snappedId of snappedIds) {
-          const snappedBox = network.getBoundingBox(snappedId);
-          if (boxesOverlap(draggedBox, snappedBox)) {
-            newHighlightedId = snappedId;
-            break;
-          }
+      // Check for overlap with snapped nodes FIRST (takes priority over top bar)
+      const draggedBox = network.getBoundingBox(nodeId);
+      const snappedIds = getSnappedNodeIds(nodesDataSet, edgesDataSet);
+      let newHighlightedId: string | null = null;
+
+      for (const snappedId of snappedIds) {
+        const snappedBox = network.getBoundingBox(snappedId);
+        if (boxesOverlap(draggedBox, snappedBox)) {
+          newHighlightedId = snappedId;
+          break;
         }
+      }
 
-        const prevHighlightedId = dragState.current.highlightedNodeId;
+      // Update node highlight
+      const prevHighlightedId = dragState.current!.highlightedNodeId;
+      if (prevHighlightedId && prevHighlightedId !== newHighlightedId) {
+        resetNodeHighlight(nodesDataSet, prevHighlightedId);
+      }
+      if (newHighlightedId && newHighlightedId !== prevHighlightedId) {
+        setNodeHighlight(nodesDataSet, newHighlightedId, HIGHLIGHT_COLOR);
+      }
+      dragState.current!.highlightedNodeId = newHighlightedId;
 
-        // Reset previous node highlight if it changed
-        if (prevHighlightedId && prevHighlightedId !== newHighlightedId) {
-          const prevNode = nodesDataSet.get(prevHighlightedId);
-          if (prevNode) {
-            nodesDataSet.update({
-              id: prevHighlightedId,
-              label: prevNode.label,
-              color: DEFAULT_NODE_COLOR,
-            } as VisNode);
-          }
+      // If overlapping a node, turn off top bar highlight
+      if (newHighlightedId) {
+        if (dragState.current!.isOverTopBar) {
+          dragState.current!.isOverTopBar = false;
+          onTopBarHighlight?.(false);
         }
-
-        // Apply new node highlight
-        if (newHighlightedId && newHighlightedId !== prevHighlightedId) {
-          const targetNode = nodesDataSet.get(newHighlightedId);
-          if (targetNode) {
-            nodesDataSet.update({
-              id: newHighlightedId,
-              label: targetNode.label,
-              color: HIGHLIGHT_COLOR,
-            } as VisNode);
-          }
-        }
-
-        dragState.current.highlightedNodeId = newHighlightedId;
-
-        // If overlapping a node, turn off top bar highlight and skip top bar check
-        if (newHighlightedId) {
-          if (dragState.current.isOverTopBar) {
-            dragState.current.isOverTopBar = false;
-            onTopBarHighlight?.(false);
-          }
-          return;
-        }
-
-        // No node overlap - check if over top bar zone
-        const container = (network as unknown as { body: { container: HTMLElement } }).body.container;
-        const canvasToDOM = network.canvasToDOM({ x: pointer.x, y: pointer.y });
-        const containerRect = container.getBoundingClientRect();
-        const domY = canvasToDOM.y - containerRect.top;
-
-        const isOverTopBar = domY < TOP_BAR_HEIGHT;
-
-        // Update top bar highlight
-        if (isOverTopBar !== dragState.current.isOverTopBar) {
-          dragState.current.isOverTopBar = isOverTopBar;
-          onTopBarHighlight?.(isOverTopBar);
-        }
-
         return;
       }
 
-      // Calculate distance from original position
+      // No node overlap - check if over top bar zone
+      const domY = canvasToDOMY(network, pointer.y);
+      const isOverTopBar = domY < TOP_BAR_HEIGHT;
+
+      if (isOverTopBar !== dragState.current!.isOverTopBar) {
+        dragState.current!.isOverTopBar = isOverTopBar;
+        onTopBarHighlight?.(isOverTopBar);
+      }
+    };
+
+    const handleConnectedDragging = (
+      nodeId: string,
+      pointer: { x: number; y: number },
+      originalY: number
+    ) => {
       const yOffset = pointer.y - originalY;
       const distance = Math.abs(yOffset);
 
       if (distance > SNAP_OUT_THRESHOLD) {
-        // Capture all node positions before modifying edges
-        const allNodeIds = nodesDataSet.get().map((n) => n.id);
-        const allPositions = network.getPositions(allNodeIds);
+        // Snap out from hierarchy
+        const positions = captureAllPositions(network, nodesDataSet);
 
-        // Snap out! Remove edges connected to this node
-        const connectedEdges = edgesDataSet.get({
-          filter: (edge) => edge.from === nodeId || edge.to === nodeId,
-        });
+        // Remove edges connected to this node
+        const connectedEdges = getConnectedEdges(nodeId, edgesDataSet);
         connectedEdges.forEach((edge) => edgesDataSet.remove(edge.id));
 
         // Clear isRoot if this was a root node
@@ -211,20 +271,13 @@ export function useNodeDrag({
           });
         }
 
-        // Restore all node positions (except the dragged node)
-        const positionUpdates = allNodeIds
-          .filter((id) => id !== nodeId)
-          .map((id) => ({
-            id,
-            label: nodesDataSet.get(id)?.label || "",
-            x: allPositions[id].x,
-            y: allPositions[id].y,
-          }));
+        // Restore all other node positions
+        const positionUpdates = createPositionUpdates(nodesDataSet, positions, [nodeId]);
         nodesDataSet.update(positionUpdates);
 
-        dragState.current.snappedOut = true;
+        dragState.current!.snappedOut = true;
 
-        // Move dragged node freely to pointer position
+        // Move dragged node to pointer position
         nodesDataSet.update({
           id: nodeId,
           label: nodesDataSet.get(nodeId)?.label || "",
@@ -234,7 +287,6 @@ export function useNodeDrag({
       } else {
         // Rubber band effect
         const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
-
         nodesDataSet.update({
           id: nodeId,
           label: nodesDataSet.get(nodeId)?.label || "",
@@ -250,131 +302,23 @@ export function useNodeDrag({
       const nodeId = params.nodes[0] as string;
       if (nodeId !== dragState.current.nodeId) return;
 
-      const { snappedOut, highlightedNodeId, isOverTopBar } = dragState.current;
+      const { snappedOut, highlightedNodeId, isOverTopBar, originalY } = dragState.current;
 
-      // Reset top bar highlight
+      // Reset highlights
       if (isOverTopBar) {
         onTopBarHighlight?.(false);
       }
-
-      // Reset node highlight if any
       if (highlightedNodeId) {
-        const highlightedNode = nodesDataSet.get(highlightedNodeId);
-        if (highlightedNode) {
-          nodesDataSet.update({
-            id: highlightedNodeId,
-            label: highlightedNode.label,
-            color: DEFAULT_NODE_COLOR,
-          } as VisNode);
-        }
+        resetNodeHighlight(nodesDataSet, highlightedNodeId);
       }
 
+      // Handle the drop based on state
       if (!snappedOut) {
-        // Snap back to original Y
-        const currentPos = network.getPositions([nodeId])[nodeId];
-        nodesDataSet.update({
-          id: nodeId,
-          label: nodesDataSet.get(nodeId)?.label || "",
-          x: currentPos.x,
-          y: dragState.current.originalY,
-        });
+        handleSnapBack(network, nodesDataSet, nodeId, originalY);
       } else if (isOverTopBar) {
-        // Free node dropped in top bar - make it a root
-        const allNodeIds = nodesDataSet.get().map((n) => n.id);
-        const allPositions = network.getPositions(allNodeIds);
-
-        // Find existing roots to position new root to their right
-        const existingRoots = nodesDataSet.get().filter((n) => n.isRoot);
-        let newRootX = 0;
-
-        if (existingRoots.length > 0) {
-          // Find the rightmost root
-          let maxX = -Infinity;
-          existingRoots.forEach((root) => {
-            const rootPos = allPositions[root.id];
-            if (rootPos && rootPos.x > maxX) {
-              maxX = rootPos.x;
-            }
-          });
-          newRootX = maxX + NODE_SPACING;
-        }
-
-        // Get the Y position of existing roots, or calculate centered in top bar
-        let rootY = 0;
-        if (existingRoots.length > 0) {
-          const firstRootPos = allPositions[existingRoots[0].id];
-          if (firstRootPos) {
-            rootY = firstRootPos.y;
-          }
-        } else {
-          // No existing roots - position centered in top bar
-          const topBarCenterInCanvas = network.DOMtoCanvas({ x: 0, y: TOP_BAR_HEIGHT / 2 });
-          rootY = topBarCenterInCanvas.y;
-        }
-
-        // Mark as root and position
-        nodesDataSet.update({
-          id: nodeId,
-          label: nodesDataSet.get(nodeId)?.label || "",
-          x: newRootX,
-          y: rootY,
-          isRoot: true,
-        });
+        handleCreateRoot(network, nodesDataSet, nodeId);
       } else if (highlightedNodeId) {
-        // Free node dropped on a snapped node - create parent-child edge
-        // Capture all node positions before adding edge (vis.js will recalculate layout)
-        const allNodeIds = nodesDataSet.get().map((n) => n.id);
-        const allPositions = network.getPositions(allNodeIds);
-
-        // Get parent position for placing the new child
-        const parentPos = allPositions[highlightedNodeId];
-
-        // Find existing children of this parent
-        const existingChildren = edgesDataSet
-          .get({ filter: (edge) => edge.from === highlightedNodeId })
-          .map((edge) => edge.to);
-
-        // Calculate X position: to the right of existing siblings, or below parent if no siblings
-        let newChildX = parentPos.x;
-        if (existingChildren.length > 0) {
-          // Find the rightmost sibling
-          let maxX = -Infinity;
-          existingChildren.forEach((childId) => {
-            const childPos = allPositions[childId];
-            if (childPos && childPos.x > maxX) {
-              maxX = childPos.x;
-            }
-          });
-          newChildX = maxX + NODE_SPACING;
-        }
-
-        // Add the edge
-        const newEdgeId = `${highlightedNodeId}-${nodeId}`;
-        edgesDataSet.add({
-          id: newEdgeId,
-          from: highlightedNodeId,
-          to: nodeId,
-        });
-
-        // Restore all existing node positions (except the newly snapped node)
-        const positionUpdates = allNodeIds
-          .filter((id) => id !== nodeId)
-          .map((id) => ({
-            id,
-            label: nodesDataSet.get(id)?.label || "",
-            x: allPositions[id].x,
-            y: allPositions[id].y,
-          }));
-
-        // Position the newly snapped node below its parent (and to right of siblings if any)
-        positionUpdates.push({
-          id: nodeId,
-          label: nodesDataSet.get(nodeId)?.label || "",
-          x: newChildX,
-          y: parentPos.y + LEVEL_SEPARATION,
-        });
-
-        nodesDataSet.update(positionUpdates);
+        handleSnapToParent(network, nodesDataSet, edgesDataSet, nodeId, highlightedNodeId);
       }
 
       dragState.current = null;
