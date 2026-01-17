@@ -40,16 +40,20 @@ pnpm add ./path/to/orgpressor-ui-0.0.1.tgz
 
 ## Peer Dependencies
 
-This library requires React 18+:
+This library requires the consuming project to provide:
 
 ```json
 {
   "peerDependencies": {
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "vis-data": ">=6.5.1",
+    "vis-network": ">=7.6.1"
   }
 }
 ```
+
+The vis-network and vis-data libraries are externalized (not bundled) to avoid version conflicts with your existing installation.
 
 ## Usage
 
@@ -128,6 +132,33 @@ pnpm build
 pnpm pack
 ```
 
+## Creating a Release
+
+Releases are automated via GitHub Actions. When you push a version tag, the workflow will:
+1. Build the library
+2. Create a `.tgz` package
+3. Create a GitHub release with the package attached
+
+### To create a release:
+
+```bash
+# Update version in apps/orgpressor-ui/package.json first, then:
+git add .
+git commit -m "Bump version to x.y.z"
+git tag vx.y.z
+git push origin main --tags
+```
+
+### Manual packaging (from project root):
+
+```bash
+# Build and pack to packages/ directory
+pnpm build
+pnpm run pack
+```
+
+This creates `packages/orgpressor-ui-x.y.z.tgz`.
+
 ## Demo
 
 See `apps/demo` for a working example of consuming this library as an external dependency.
@@ -141,24 +172,28 @@ pnpm dev --filter demo
 
 Complete workflow for deploying to an air-gapped network with Artifactory.
 
-### Phase 1: Build the Package (on connected machine)
+### Phase 1: Get the Package
+
+**Option A: Download from GitHub Releases (recommended)**
+
+Download the `.tgz` file from the [GitHub Releases](../../releases) page.
+
+**Option B: Build locally**
 
 ```bash
-# Clone the repo and navigate to the library
+# Clone the repo
 git clone <repo-url>
-cd orgpressor/apps/orgpressor-ui
+cd orgpressor
 
 # Install dependencies
 pnpm install
 
-# Build the library (creates dist/ folder)
+# Build and pack
 pnpm build
-
-# Create the distributable package
-pnpm pack
+pnpm run pack
 ```
 
-This produces: `orgpressor-ui-0.0.1.tgz`
+This produces: `packages/orgpressor-ui-x.y.z.tgz`
 
 ### Phase 2: Upload to Air-Gapped Network
 
@@ -271,6 +306,12 @@ function OrgChartPage() {
 ```bash
 # Ensure React 18+ is installed in your project
 pnpm add react react-dom
+```
+
+**"vis-network" or "vis-data" module not found:**
+```bash
+# Ensure vis libraries are installed (these are peer dependencies)
+pnpm add vis-data@6.5.1 vis-network@7.6.1
 ```
 
 **TypeScript can't find types:**
