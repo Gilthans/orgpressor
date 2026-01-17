@@ -42,4 +42,6 @@ export interface DragState {
   highlightedNodeId: string | null;
   isOverTopBar: boolean;
   subtree: SubtreeContext;
+  /** Offset between click point and node center (calculated on first drag event) */
+  pointerOffset: { dx: number; dy: number } | null;
 }

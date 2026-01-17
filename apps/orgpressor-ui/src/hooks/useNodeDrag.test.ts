@@ -24,12 +24,13 @@ describe("useNodeDrag", () => {
 
   const simulateDrag = (
     nodeId: string,
+    startX: number,
     startY: number,
     pointerX: number,
     pointerY: number
   ) => {
     // Update the position for the dragged node while keeping others
-    const positions = { ...allPositions, [nodeId]: { x: 100, y: startY } };
+    const positions = { ...allPositions, [nodeId]: { x: startX, y: startY } };
 
     mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
       if (!ids) return positions;
@@ -41,6 +42,12 @@ describe("useNodeDrag", () => {
     });
 
     eventHandlers["dragStart"]({ nodes: [nodeId] });
+    // First dragging event - pointer at node center to establish zero offset
+    eventHandlers["dragging"]({
+      nodes: [nodeId],
+      pointer: { canvas: { x: startX, y: startY } },
+    });
+    // Second dragging event - actual drag to target position
     eventHandlers["dragging"]({
       nodes: [nodeId],
       pointer: { canvas: { x: pointerX, y: pointerY } },
@@ -137,9 +144,15 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
       eventHandlers["dragging"]({
         nodes: ["2"],
-        pointer: { canvas: { x: 250, y: dragY } },
+        pointer: { canvas: { x: 200, y: startY } },
+      });
+      // Actual drag
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 200, y: dragY } },
       });
 
       const expectedY = startY + (dragY - startY) * RUBBER_BAND_FACTOR;
@@ -148,7 +161,7 @@ describe("useNodeDrag", () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: "2",
-            x: 250,
+            x: 200, // X stays at original since this is a vertical drag test
             y: expectedY,
           }),
         ])
@@ -160,10 +173,11 @@ describe("useNodeDrag", () => {
       setupHook();
 
       const startY = 300;
+      const startX = 200;
       const dragX = 250;
       const positions: Record<string, { x: number; y: number }> = {
         ...allPositions,
-        "2": { x: 200, y: startY },
+        "2": { x: startX, y: startY },
       };
       mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
         if (!ids) return positions;
@@ -175,6 +189,12 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      // Actual drag
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: dragX, y: 330 } },
@@ -204,13 +224,14 @@ describe("useNodeDrag", () => {
       // When we drag node 2 (the child), it should remove edge "1-2"
       setupHook();
 
+      const startX = 200;
       const startY = 300; // Node 2's Y position
       const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
 
       // Drag node 2 (the child)
       const positions: Record<string, { x: number; y: number }> = {
         ...allPositions,
-        "2": { x: 200, y: startY },
+        "2": { x: startX, y: startY },
       };
       mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
         if (!ids) return positions;
@@ -222,6 +243,12 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      // Actual drag past threshold
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: 250, y: dragY } },
@@ -233,13 +260,14 @@ describe("useNodeDrag", () => {
     it("preserves other nodes positions when child disconnects", () => {
       setupHook();
 
+      const startX = 200;
       const startY = 300; // Node 2's Y position
       const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
 
       // Drag node 2 (the child) - it has no descendants
       const positions: Record<string, { x: number; y: number }> = {
         ...allPositions,
-        "2": { x: 200, y: startY },
+        "2": { x: startX, y: startY },
       };
       mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
         if (!ids) return positions;
@@ -251,6 +279,12 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      // Actual drag past threshold
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: 250, y: dragY } },
@@ -268,11 +302,12 @@ describe("useNodeDrag", () => {
     it("moves freely (no rubber band) after disconnecting", () => {
       setupHook();
 
+      const startX = 200;
       const startY = 300;
       // Drag node 2 past threshold to disconnect
       const positions: Record<string, { x: number; y: number }> = {
         ...allPositions,
-        "2": { x: 200, y: startY },
+        "2": { x: startX, y: startY },
       };
       mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
         if (!ids) return positions;
@@ -284,6 +319,12 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      // Drag past threshold to disconnect
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: 250, y: startY + SNAP_OUT_THRESHOLD + 50 } },
@@ -291,7 +332,7 @@ describe("useNodeDrag", () => {
 
       vi.mocked(mockNodesDataSet.update).mockClear();
 
-      // Continue dragging
+      // Continue dragging - pointer offset is already established (zero)
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: 300, y: 500 } },
@@ -311,11 +352,12 @@ describe("useNodeDrag", () => {
     it("stays at dropped position after disconnecting (no snap back)", () => {
       setupHook();
 
+      const startX = 200;
       const startY = 300;
       // Drag node 2 past threshold to disconnect
       const positions: Record<string, { x: number; y: number }> = {
         ...allPositions,
-        "2": { x: 200, y: startY },
+        "2": { x: startX, y: startY },
       };
       mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
         if (!ids) return positions;
@@ -327,6 +369,12 @@ describe("useNodeDrag", () => {
       });
 
       eventHandlers["dragStart"]({ nodes: ["2"] });
+      // First drag at node position to establish zero pointer offset
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      // Drag past threshold to disconnect
       eventHandlers["dragging"]({
         nodes: ["2"],
         pointer: { canvas: { x: 250, y: startY + SNAP_OUT_THRESHOLD + 50 } },
@@ -344,10 +392,11 @@ describe("useNodeDrag", () => {
       // But its children should still move with it
       setupHook();
 
+      const startX = 100;
       const startY = 200;
-      const dragY = 230;
       const dragX = 150;
-      simulateDrag("1", startY, dragX, dragY);
+      const dragY = 230;
+      simulateDrag("1", startX, startY, dragX, dragY);
 
       // Node 1 moves freely (no rubber band since it has no parent)
       // Child should move with same relative offset
@@ -374,7 +423,8 @@ describe("useNodeDrag", () => {
     it("moves freely without rubber band effect", () => {
       setupHook();
 
-      simulateDrag("1", 200, 300, 400);
+      // Node 1 starts at (100, 200), drag to (300, 400)
+      simulateDrag("1", 100, 200, 300, 400);
 
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -390,7 +440,7 @@ describe("useNodeDrag", () => {
     it("stays at dropped position (no snap back)", () => {
       setupHook();
 
-      simulateDrag("1", 200, 300, 400);
+      simulateDrag("1", 100, 200, 300, 400);
       vi.mocked(mockNodesDataSet.update).mockClear();
 
       simulateDragEnd("1");
