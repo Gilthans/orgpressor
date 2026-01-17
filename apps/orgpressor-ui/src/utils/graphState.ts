@@ -1,0 +1,25 @@
+import type { DataSet } from "vis-network/standalone";
+import type { VisNode, VisEdge, GraphChangeData } from "../types";
+
+/**
+ * Extracts the current graph state from the DataSets.
+ * Returns data suitable for persistence by the consuming application.
+ */
+export function extractGraphState(
+  nodesDataSet: DataSet<VisNode>,
+  edgesDataSet: DataSet<VisEdge>
+): GraphChangeData {
+  const nodes = nodesDataSet.get().map((node) => ({
+    id: node.id,
+    name: node.name,
+    metadata: node.metadata,
+    isRoot: node.isRoot,
+  }));
+
+  const edges = edgesDataSet.get().map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+  }));
+
+  return { nodes, edges };
+}

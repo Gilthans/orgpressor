@@ -33,7 +33,8 @@ export function useVisNetwork({
     const visNodes = new DataSet<VisNode>(
       nodes.map((node) => ({
         id: node.id,
-        label: node.label,
+        name: node.label, // Store original name
+        label: node.label, // Display label (will be formatted with role if present)
       }))
     );
     nodesDataSetRef.current = visNodes;

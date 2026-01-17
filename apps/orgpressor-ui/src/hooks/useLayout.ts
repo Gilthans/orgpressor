@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Network, DataSet } from "vis-network/standalone";
+import { updateNode } from "../types";
 import type { VisNode, VisEdge } from "../types";
 import {
   FREE_NODES_TOP_MARGIN,
@@ -78,13 +79,13 @@ export function useLayout({
       const yShift = targetRootY - hierarchyTop;
 
       // Shift all connected nodes and mark roots
-      const connectedUpdates: VisNode[] = connectedNodes.map((node) => ({
-        id: node.id,
-        label: node.label,
-        x: positions[node.id]?.x ?? 0,
-        y: (positions[node.id]?.y ?? 0) + yShift,
-        isRoot: rootNodeIds.has(node.id) || node.isRoot,
-      }));
+      const connectedUpdates: VisNode[] = connectedNodes.map((node) =>
+        updateNode(node, {
+          x: positions[node.id]?.x ?? 0,
+          y: (positions[node.id]?.y ?? 0) + yShift,
+          isRoot: rootNodeIds.has(node.id) || node.isRoot,
+        })
+      );
 
       // Position free nodes in a grid below the shifted hierarchy
       const newHierarchyBottom = hierarchyBottom + yShift;
@@ -97,12 +98,10 @@ export function useLayout({
         const row = Math.floor(index / FREE_NODES_PER_ROW);
         const col = index % FREE_NODES_PER_ROW;
 
-        return {
-          id: node.id,
-          label: node.label,
+        return updateNode(node, {
           x: startX + col * FREE_NODES_SPACING,
           y: freeNodesStartY + row * FREE_NODES_SPACING,
-        };
+        });
       });
 
       // Apply all updates

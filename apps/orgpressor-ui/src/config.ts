@@ -49,7 +49,10 @@ export const networkOptions: Options = {
   nodes: {
     shape: "box",
     margin: { top: 10, right: 10, bottom: 10, left: 10 },
-    font: { size: 14 },
+    font: {
+      size: 14,
+      multi: "html", // Enable HTML-style formatting for multi-line labels
+    },
     color: {
       background: "#e3f2fd",
       border: "#1976d2",

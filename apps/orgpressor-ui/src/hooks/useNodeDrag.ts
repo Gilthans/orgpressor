@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Network, DataSet } from "vis-network/standalone";
+import { updateNode } from "../types";
 import type { VisNode, VisEdge, DragState } from "../types";
 import {
   RUBBER_BAND_FACTOR,
@@ -34,6 +35,7 @@ interface UseNodeDragProps {
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
   onTopBarHighlight?: (highlighted: boolean) => void;
+  onHierarchyChange?: () => void;
 }
 
 // --- Highlight Helpers ---
@@ -45,11 +47,7 @@ function setNodeHighlight(
 ): void {
   const node = nodesDataSet.get(nodeId);
   if (node) {
-    nodesDataSet.update({
-      id: nodeId,
-      label: node.label,
-      color,
-    } as VisNode);
+    nodesDataSet.update(updateNode(node, { color }));
   }
 }
 
@@ -184,6 +182,7 @@ export function useNodeDrag({
   nodesDataSet,
   edgesDataSet,
   onTopBarHighlight,
+  onHierarchyChange,
 }: UseNodeDragProps): void {
   const dragState = useRef<DragState | null>(null);
 
@@ -205,6 +204,7 @@ export function useNodeDrag({
         highlightedNodeId: null,
         isOverTopBar: false,
         subtree,
+        pointerOffset: null, // Calculated on first drag event
       };
     };
 
@@ -220,6 +220,15 @@ export function useNodeDrag({
       const pointer = params.pointer.canvas;
       const { originalY, snappedOut } = dragState.current;
 
+      // Calculate pointer offset on first drag event (offset from node center to click point)
+      if (dragState.current.pointerOffset === null) {
+        const currentPos = network.getPositions([nodeId])[nodeId];
+        dragState.current.pointerOffset = {
+          dx: pointer.x - currentPos.x,
+          dy: pointer.y - currentPos.y,
+        };
+      }
+
       if (snappedOut) {
         handleFreeDragging(nodeId, pointer);
       } else {
@@ -231,14 +240,18 @@ export function useNodeDrag({
       nodeId: string,
       pointer: { x: number; y: number }
     ) => {
-      const { subtree } = dragState.current!;
+      const { subtree, pointerOffset } = dragState.current!;
 
-      // Move subtree freely
+      // Calculate actual node position (pointer adjusted by click offset)
+      const nodeX = pointer.x - pointerOffset!.dx;
+      const nodeY = pointer.y - pointerOffset!.dy;
+
+      // Move subtree freely (using adjusted position, not raw pointer)
       const updates = createSubtreeMoveUpdates(
         nodesDataSet,
         subtree,
-        pointer.x,
-        pointer.y
+        nodeX,
+        nodeY
       );
       nodesDataSet.update(updates);
 
@@ -279,8 +292,8 @@ export function useNodeDrag({
         return;
       }
 
-      // No node overlap - check if over top bar zone
-      const domY = canvasToDOMY(network, pointer.y);
+      // No node overlap - check if over top bar zone (use node position, not pointer)
+      const domY = canvasToDOMY(network, nodeY);
       const isOverTopBar = domY < TOP_BAR_HEIGHT;
 
       if (isOverTopBar !== dragState.current!.isOverTopBar) {
@@ -294,8 +307,13 @@ export function useNodeDrag({
       pointer: { x: number; y: number },
       originalY: number
     ) => {
-      const { subtree } = dragState.current!;
-      const yOffset = pointer.y - originalY;
+      const { subtree, pointerOffset } = dragState.current!;
+
+      // Calculate actual node position (pointer adjusted by click offset)
+      const nodeX = pointer.x - pointerOffset!.dx;
+      const nodeY = pointer.y - pointerOffset!.dy;
+
+      const yOffset = nodeY - originalY;
       const distance = Math.abs(yOffset);
 
       if (distance > SNAP_OUT_THRESHOLD) {
@@ -311,11 +329,7 @@ export function useNodeDrag({
         // Clear isRoot if this was a root node
         const node = nodesDataSet.get(nodeId);
         if (node?.isRoot) {
-          nodesDataSet.update({
-            id: nodeId,
-            label: node.label,
-            isRoot: false,
-          });
+          nodesDataSet.update(updateNode(node, { isRoot: false }));
         }
 
         // Restore positions of nodes NOT in subtree
@@ -329,24 +343,27 @@ export function useNodeDrag({
 
         dragState.current!.snappedOut = true;
 
-        // Move subtree to pointer position
+        // Move subtree to adjusted position (not raw pointer)
         const subtreeUpdates = createSubtreeMoveUpdates(
           nodesDataSet,
           subtree,
-          pointer.x,
-          pointer.y
+          nodeX,
+          nodeY
         );
         nodesDataSet.update(subtreeUpdates);
+
+        // Notify that hierarchy changed (node disconnected)
+        onHierarchyChange?.();
       } else {
         // Rubber band effect - move entire subtree
         const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
-        const xOffset = pointer.x - dragState.current!.originalX;
+        const xOffset = nodeX - dragState.current!.originalX;
 
-        // For rubber band, we need custom positioning since Y is constrained
+        // Move subtree with rubber band Y constraint
         const updates = createSubtreeMoveUpdates(
           nodesDataSet,
           subtree,
-          pointer.x,
+          nodeX,
           rubberBandY
         );
 
@@ -387,6 +404,7 @@ export function useNodeDrag({
         handleSnapBack(nodesDataSet, dragState.current, currentPos.x);
       } else if (isOverTopBar) {
         handleCreateRoot(network, nodesDataSet, dragState.current);
+        onHierarchyChange?.();
       } else if (highlightedNodeId) {
         handleSnapToParent(
           network,
@@ -395,6 +413,7 @@ export function useNodeDrag({
           dragState.current,
           highlightedNodeId
         );
+        onHierarchyChange?.();
       }
 
       dragState.current = null;
@@ -409,5 +428,5 @@ export function useNodeDrag({
       network.off("dragging", handleDragging);
       network.off("dragEnd", handleDragEnd);
     };
-  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight]);
+  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight, onHierarchyChange]);
 }

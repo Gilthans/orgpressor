@@ -2,9 +2,14 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import type { Network } from "vis-network";
 import type { DataSet } from "vis-data";
 import type { PersonNode, HierarchyEdge, VisNode, VisEdge } from "../types";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { formatNodeLabel, updateNode } from "../types";
+import type { PersonNode, HierarchyEdge, NodeMetadata, GraphChangeData } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
+import { extractGraphState } from "../utils/graphState";
 import { TopBar } from "./TopBar";
+import { EditNodeDialog } from "./EditNodeDialog";
 
 // Expose network for e2e testing
 declare global {
@@ -20,11 +25,14 @@ declare global {
 interface OrgGraphProps {
   nodes: PersonNode[];
   edges: HierarchyEdge[];
+  onChange?: (data: GraphChangeData) => void;
 }
 
-export function OrgGraph({ nodes, edges }: OrgGraphProps) {
+export function OrgGraph({ nodes, edges, onChange }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
 
   const { network, nodesDataSet, edgesDataSet } = useVisNetwork({
     containerRef,
@@ -43,14 +51,62 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
     setIsTopBarHighlighted(highlighted);
   }, []);
 
+  const notifyChange = useCallback(() => {
+    if (onChange) {
+      onChange(extractGraphState(nodesDataSet, edgesDataSet));
+    }
+  }, [onChange, nodesDataSet, edgesDataSet]);
+
   useNodeDrag({
     network,
     nodesDataSet,
     edgesDataSet,
     onTopBarHighlight: handleTopBarHighlight,
+    onHierarchyChange: notifyChange,
   });
 
-  useViewConstraints({ network });
+  useViewConstraints({ network, onScaleChange: setScale });
+
+  // Handle double-click to edit node metadata
+  useEffect(() => {
+    if (!network) return;
+
+    const handleDoubleClick = (params: { nodes: (string | number)[] }) => {
+      if (params.nodes.length === 1) {
+        setEditingNodeId(params.nodes[0] as string);
+      }
+    };
+
+    network.on("doubleClick", handleDoubleClick);
+    return () => {
+      network.off("doubleClick", handleDoubleClick);
+    };
+  }, [network]);
+
+  const handleSaveMetadata = useCallback(
+    (metadata: NodeMetadata) => {
+      if (!editingNodeId) return;
+
+      const node = nodesDataSet.get(editingNodeId);
+      if (node) {
+        nodesDataSet.update(
+          updateNode(node, {
+            label: formatNodeLabel(node.name, metadata),
+            metadata,
+          })
+        );
+        notifyChange();
+      }
+      setEditingNodeId(null);
+    },
+    [editingNodeId, nodesDataSet, notifyChange]
+  );
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingNodeId(null);
+  }, []);
+
+  const editingNode = editingNodeId ? nodesDataSet.get(editingNodeId) : null;
 
   // Expose network for e2e testing
   useEffect(() => {
@@ -64,8 +120,16 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <TopBar isHighlighted={isTopBarHighlighted} />
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <TopBar isHighlighted={isTopBarHighlighted} scale={scale} />
+      <div ref={containerRef} style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }} />
+      {editingNode && (
+        <EditNodeDialog
+          nodeName={editingNode.name}
+          metadata={editingNode.metadata || {}}
+          onSave={handleSaveMetadata}
+          onCancel={handleCancelEdit}
+        />
+      )}
     </div>
   );
 }

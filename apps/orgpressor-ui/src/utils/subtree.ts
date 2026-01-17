@@ -1,4 +1,5 @@
 import type { Network, DataSet } from "vis-network/standalone";
+import { updateNode } from "../types";
 import type { VisNode, VisEdge, SubtreeContext } from "../types";
 import { getAllDescendantIds } from "./hierarchy";
 
@@ -57,25 +58,18 @@ export function createSubtreeMoveUpdates(
 ): VisNode[] {
   const { rootId, descendantIds, relativePositions } = subtree;
 
+  const rootNode = nodesDataSet.get(rootId);
+  if (!rootNode) return [];
+
   const updates: VisNode[] = [
-    {
-      id: rootId,
-      label: nodesDataSet.get(rootId)?.label || "",
-      x: newX,
-      y: newY,
-      ...rootProps,
-    },
+    updateNode(rootNode, { x: newX, y: newY, ...rootProps }),
   ];
 
   descendantIds.forEach((id) => {
     const rel = relativePositions[id];
-    if (rel) {
-      updates.push({
-        id,
-        label: nodesDataSet.get(id)?.label || "",
-        x: newX + rel.dx,
-        y: newY + rel.dy,
-      });
+    const node = nodesDataSet.get(id);
+    if (rel && node) {
+      updates.push(updateNode(node, { x: newX + rel.dx, y: newY + rel.dy }));
     }
   });
 

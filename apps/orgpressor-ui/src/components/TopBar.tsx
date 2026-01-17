@@ -2,9 +2,12 @@ import { TOP_BAR_HEIGHT, TOP_BAR_COLOR } from "../config";
 
 interface TopBarProps {
   isHighlighted: boolean;
+  scale?: number;
 }
 
-export function TopBar({ isHighlighted }: TopBarProps) {
+export function TopBar({ isHighlighted, scale = 1 }: TopBarProps) {
+  const scaledHeight = TOP_BAR_HEIGHT * scale;
+
   return (
     <div
       data-testid="top-bar"
@@ -14,7 +17,7 @@ export function TopBar({ isHighlighted }: TopBarProps) {
         top: 0,
         left: 0,
         right: 0,
-        height: TOP_BAR_HEIGHT,
+        height: scaledHeight,
         backgroundColor: isHighlighted
           ? TOP_BAR_COLOR.highlightBackground
           : TOP_BAR_COLOR.background,
@@ -22,7 +25,7 @@ export function TopBar({ isHighlighted }: TopBarProps) {
           isHighlighted ? TOP_BAR_COLOR.highlightBorder : TOP_BAR_COLOR.border
         }`,
         pointerEvents: "none",
-        zIndex: 1,
+        zIndex: 0,
         transition: "background-color 0.15s, border-color 0.15s",
       }}
     />

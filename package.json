@@ -6,7 +6,8 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "pack": "mkdir -p packages && cd apps/orgpressor-ui && pnpm pack --pack-destination ../../packages"
   },
   "devDependencies": {
     "turbo": "^2"

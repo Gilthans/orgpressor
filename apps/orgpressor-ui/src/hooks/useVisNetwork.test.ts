@@ -53,6 +53,7 @@ describe("useVisNetwork", () => {
     // Datasets should be usable
     expect(result.current.nodesDataSet.get("1")).toEqual({
       id: "1",
+      name: "Node 1",
       label: "Node 1",
     });
     expect(result.current.edgesDataSet.get("1-2")).toEqual({

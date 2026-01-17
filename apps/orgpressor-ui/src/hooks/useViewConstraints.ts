@@ -3,13 +3,14 @@ import type { Network } from "vis-network/standalone";
 
 interface UseViewConstraintsProps {
   network: Network | null;
+  onScaleChange?: (scale: number) => void;
 }
 
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 2;
 const ZOOM_SPEED = 0.001;
 
-export function useViewConstraints({ network }: UseViewConstraintsProps): void {
+export function useViewConstraints({ network, onScaleChange }: UseViewConstraintsProps): void {
   const isDragging = useRef(false);
   const lastX = useRef(0);
   const lockedY = useRef(0);
@@ -19,6 +20,9 @@ export function useViewConstraints({ network }: UseViewConstraintsProps): void {
 
     const container = (network as unknown as { body: { container: HTMLElement } }).body.container;
     const containerHeight = container.clientHeight;
+
+    // Report initial scale
+    onScaleChange?.(network.getScale());
 
     // Calculate the top Y position in canvas coordinates
     const getTopY = (viewY: number, scale: number) => {
@@ -99,6 +103,8 @@ export function useViewConstraints({ network }: UseViewConstraintsProps): void {
         scale: newScale,
         animation: false,
       });
+
+      onScaleChange?.(newScale);
     };
 
     container.addEventListener("mousedown", handleMouseDown);
@@ -114,5 +120,5 @@ export function useViewConstraints({ network }: UseViewConstraintsProps): void {
       container.removeEventListener("mouseleave", handleMouseLeave);
       container.removeEventListener("wheel", handleWheel);
     };
-  }, [network]);
+  }, [network, onScaleChange]);
 }
