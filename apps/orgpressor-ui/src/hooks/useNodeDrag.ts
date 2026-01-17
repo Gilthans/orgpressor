@@ -67,15 +67,30 @@ export function useNodeDrag({
       const distance = Math.abs(yOffset);
 
       if (distance > SNAP_OUT_THRESHOLD) {
+        // Capture all node positions before modifying edges
+        const allNodeIds = nodesDataSet.get().map((n) => n.id);
+        const allPositions = network.getPositions(allNodeIds);
+
         // Snap out! Remove edges connected to this node
         const connectedEdges = edgesDataSet.get({
           filter: (edge) => edge.from === nodeId || edge.to === nodeId,
         });
         connectedEdges.forEach((edge) => edgesDataSet.remove(edge.id));
 
+        // Restore all node positions (except the dragged node)
+        const positionUpdates = allNodeIds
+          .filter((id) => id !== nodeId)
+          .map((id) => ({
+            id,
+            label: nodesDataSet.get(id)?.label || "",
+            x: allPositions[id].x,
+            y: allPositions[id].y,
+          }));
+        nodesDataSet.update(positionUpdates);
+
         dragState.current.snappedOut = true;
 
-        // Move node freely
+        // Move dragged node freely to pointer position
         nodesDataSet.update({
           id: nodeId,
           label: nodesDataSet.get(nodeId)?.label || "",

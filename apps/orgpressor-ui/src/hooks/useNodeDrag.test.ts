@@ -27,8 +27,16 @@ describe("useNodeDrag", () => {
     pointerX: number,
     pointerY: number
   ) => {
-    mockNetwork.getPositions = vi.fn().mockReturnValue({
-      [nodeId]: { x: 100, y: startY },
+    // Update the position for the dragged node while keeping others
+    const positions = { ...allPositions, [nodeId]: { x: 100, y: startY } };
+
+    mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+      if (!ids) return positions;
+      const result: Record<string, { x: number; y: number }> = {};
+      ids.forEach((id) => {
+        if (positions[id]) result[id] = positions[id];
+      });
+      return result;
     });
 
     eventHandlers["dragStart"]({ nodes: [nodeId] });
@@ -42,6 +50,18 @@ describe("useNodeDrag", () => {
     eventHandlers["dragEnd"]({ nodes: [nodeId] });
   };
 
+  const allNodes = [
+    { id: "1", label: "Node 1" },
+    { id: "2", label: "Node 2" },
+    { id: "3", label: "Node 3" },
+  ];
+
+  const allPositions: Record<string, { x: number; y: number }> = {
+    "1": { x: 100, y: 200 },
+    "2": { x: 200, y: 300 },
+    "3": { x: 300, y: 300 },
+  };
+
   beforeEach(() => {
     eventHandlers = {};
 
@@ -50,16 +70,24 @@ describe("useNodeDrag", () => {
         eventHandlers[event] = handler;
       }),
       off: vi.fn(),
-      getPositions: vi.fn().mockReturnValue({
-        "1": { x: 100, y: 200 },
+      getPositions: vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return allPositions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (allPositions[id]) result[id] = allPositions[id];
+        });
+        return result;
       }),
       destroy: vi.fn(),
     } as unknown as Network;
 
     mockNodesDataSet = {
-      get: vi.fn().mockImplementation((id) => {
-        if (id === "1") return { id: "1", label: "Node 1" };
-        return null;
+      get: vi.fn().mockImplementation((idOrFilter?: string | { filter: Function }) => {
+        if (idOrFilter === undefined) return allNodes;
+        if (typeof idOrFilter === "string") {
+          return allNodes.find((n) => n.id === idOrFilter) || null;
+        }
+        return allNodes;
       }),
       update: vi.fn(),
     } as unknown as DataSet<VisNode>;
@@ -118,6 +146,22 @@ describe("useNodeDrag", () => {
       simulateDrag("1", startY, 150, dragY);
 
       expect(mockEdgesDataSet.remove).toHaveBeenCalledWith("1-2");
+    });
+
+    it("preserves other nodes positions when disconnecting", () => {
+      setupHook();
+
+      const startY = 200;
+      const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
+      simulateDrag("1", startY, 150, dragY);
+
+      // Other nodes should be updated with their original positions
+      expect(mockNodesDataSet.update).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "2", x: 200, y: 300 }),
+          expect.objectContaining({ id: "3", x: 300, y: 300 }),
+        ])
+      );
     });
 
     it("moves freely (no rubber band) after disconnecting", () => {
