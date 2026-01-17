@@ -86,7 +86,7 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <TopBar isHighlighted={isTopBarHighlighted} scale={scale} />
-      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      <div ref={containerRef} style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }} />
       {editingNode && (
         <EditNodeDialog
           nodeName={editingNode.name}
