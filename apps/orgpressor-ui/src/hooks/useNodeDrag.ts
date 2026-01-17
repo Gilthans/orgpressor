@@ -302,11 +302,13 @@ export function useNodeDrag({
         return;
       }
 
-      // No node overlap - check if over top bar zone (use node position, not pointer)
+      // No node overlap - check if over top bar zone
+      // Use node's bounding box TOP edge, not center, so highlight triggers on intersection
       // Account for view scale since TopBar height is scaled
-      const domY = canvasToDOMY(network, nodeY);
+      const nodeTopEdgeY = draggedBox.top;
+      const topEdgeDomY = canvasToDOMY(network, nodeTopEdgeY);
       const scaledTopBarHeight = TOP_BAR_HEIGHT * scale;
-      const isOverTopBar = domY < scaledTopBarHeight;
+      const isOverTopBar = topEdgeDomY < scaledTopBarHeight;
 
       if (isOverTopBar !== dragState.current!.isOverTopBar) {
         dragState.current!.isOverTopBar = isOverTopBar;

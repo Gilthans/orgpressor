@@ -58,6 +58,7 @@ The vis-network and vis-data libraries are externalized (not bundled) to avoid v
 ## Usage
 
 ```tsx
+import { useState } from 'react';
 import { OrgGraph } from 'orgpressor-ui';
 import type { PersonNode, HierarchyEdge, GraphChangeData } from 'orgpressor-ui';
 
@@ -73,14 +74,27 @@ const edges: HierarchyEdge[] = [
 ];
 
 function App() {
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+
     const handleChange = (data: GraphChangeData) => {
         console.log('Graph changed:', data);
         // Persist to backend, update state, etc.
     };
 
     return (
-        <div style={{ width: '100%', height: '500px' }}>
-            <OrgGraph nodes={nodes} edges={edges} onChange={handleChange} />
+        <div>
+            <div style={{ width: '100%', height: '500px' }}>
+                <OrgGraph
+                    nodes={nodes}
+                    edges={edges}
+                    onChange={handleChange}
+                    selectedNodeId={selectedId}
+                    onSelectedNodeChange={setSelectedId}
+                />
+            </div>
+            {selectedId && <p>Selected: {selectedId}</p>}
+            <button onClick={() => setSelectedId('1')}>Select Alice</button>
+            <button onClick={() => setSelectedId(null)}>Clear Selection</button>
         </div>
     );
 }
@@ -97,8 +111,17 @@ interface OrgGraphProps {
     nodes: PersonNode[];
     edges: HierarchyEdge[];
     onChange?: (data: GraphChangeData) => void;
+    selectedNodeId?: string | null;
+    onSelectedNodeChange?: (nodeId: string | null) => void;
 }
 ```
+
+**Props:**
+- `nodes` - Array of nodes to display
+- `edges` - Array of edges connecting nodes
+- `onChange` - Called when graph structure changes (see below)
+- `selectedNodeId` - Controlled selected node ID (optional)
+- `onSelectedNodeChange` - Called when user clicks a node or empty space
 
 The `onChange` callback is called whenever the graph structure changes:
 - Node detached from parent (dragged out of hierarchy)

@@ -17,6 +17,12 @@ interface UseLayoutProps {
   edgesDataSet: DataSet<VisEdge>;
 }
 
+/**
+ * Handles initial layout arrangement of nodes.
+ * Positions roots in the top bar and free nodes below the hierarchy.
+ *
+ * Note: Resize handling is done by useViewConstraints, which manages all view state.
+ */
 export function useLayout({
   network,
   nodesDataSet,
@@ -24,6 +30,8 @@ export function useLayout({
 }: UseLayoutProps): void {
   useEffect(() => {
     if (!network) return;
+
+    const container = getNetworkContainer(network);
 
     const arrangeNodes = () => {
       const allNodes = nodesDataSet.get();
@@ -71,7 +79,6 @@ export function useLayout({
       if (hierarchyBottom === -Infinity) hierarchyBottom = 0;
 
       // Calculate how much to shift all nodes to put roots inside the top bar
-      const container = getNetworkContainer(network);
       const containerHeight = container.clientHeight;
 
       // Target Y position for roots (in canvas coordinates) - centered in top bar

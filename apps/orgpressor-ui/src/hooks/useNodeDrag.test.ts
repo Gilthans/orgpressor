@@ -19,6 +19,7 @@ describe("useNodeDrag", () => {
         network: mockNetwork,
         nodesDataSet: mockNodesDataSet,
         edgesDataSet: mockEdgesDataSet,
+        scale: 1,
       })
     );
   };
@@ -90,7 +91,11 @@ describe("useNodeDrag", () => {
         });
         return result;
       }),
-      getBoundingBox: vi.fn().mockReturnValue({ top: 0, left: 0, right: 100, bottom: 50 }),
+      getBoundingBox: vi.fn().mockImplementation((nodeId: string) => {
+        // Return bounding box around the node position with ~50px height
+        const pos = allPositions[nodeId] || { x: 0, y: 0 };
+        return { top: pos.y - 25, left: pos.x - 50, right: pos.x + 50, bottom: pos.y + 25 };
+      }),
       canvasToDOM: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
       DOMtoCanvas: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
       body: {
@@ -449,6 +454,136 @@ describe("useNodeDrag", () => {
       simulateDragEnd("1");
 
       expect(mockNodesDataSet.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("onHierarchyChange callback", () => {
+    it("calls onHierarchyChange when node disconnects from parent", () => {
+      const onHierarchyChange = vi.fn();
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          scale: 1,
+          onHierarchyChange,
+        })
+      );
+
+      const startX = 200;
+      const startY = 300; // Node 2's Y position
+      const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
+
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: startX, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: dragY } },
+      });
+
+      expect(onHierarchyChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onHierarchyChange when node stays within threshold", () => {
+      const onHierarchyChange = vi.fn();
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          scale: 1,
+          onHierarchyChange,
+        })
+      );
+
+      const startX = 200;
+      const startY = 300;
+      const dragY = startY + 30; // Within threshold
+
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: startX, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: dragY } },
+      });
+      eventHandlers["dragEnd"]({ nodes: ["2"] });
+
+      expect(onHierarchyChange).not.toHaveBeenCalled();
+    });
+
+    it("does not call onHierarchyChange when free node is dragged", () => {
+      const onHierarchyChange = vi.fn();
+      allEdges = [];
+      mockEdgesDataSet.get = vi.fn().mockImplementation(() => []);
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          scale: 1,
+          onHierarchyChange,
+        })
+      );
+
+      const positions: Record<string, { x: number; y: number }> = {
+        "1": { x: 100, y: 200 },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["1"] });
+      eventHandlers["dragging"]({
+        nodes: ["1"],
+        pointer: { canvas: { x: 100, y: 200 } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["1"],
+        pointer: { canvas: { x: 300, y: 400 } },
+      });
+      eventHandlers["dragEnd"]({ nodes: ["1"] });
+
+      expect(onHierarchyChange).not.toHaveBeenCalled();
     });
   });
 });
