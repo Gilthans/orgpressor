@@ -25,7 +25,7 @@ export function TopBar({ isHighlighted, scale = 1 }: TopBarProps) {
           isHighlighted ? TOP_BAR_COLOR.highlightBorder : TOP_BAR_COLOR.border
         }`,
         pointerEvents: "none",
-        zIndex: 1,
+        zIndex: 0,
         transition: "background-color 0.15s, border-color 0.15s",
       }}
     />
