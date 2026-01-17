@@ -15,6 +15,7 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
 
   const { network, nodesDataSet, edgesDataSet } = useVisNetwork({
     containerRef,
@@ -40,7 +41,7 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
     onTopBarHighlight: handleTopBarHighlight,
   });
 
-  useViewConstraints({ network });
+  useViewConstraints({ network, onScaleChange: setScale });
 
   // Handle double-click to edit node metadata
   useEffect(() => {
@@ -84,7 +85,7 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <TopBar isHighlighted={isTopBarHighlighted} />
+      <TopBar isHighlighted={isTopBarHighlighted} scale={scale} />
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
       {editingNode && (
         <EditNodeDialog
