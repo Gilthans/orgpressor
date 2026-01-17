@@ -91,7 +91,11 @@ describe("useNodeDrag", () => {
         });
         return result;
       }),
-      getBoundingBox: vi.fn().mockReturnValue({ top: 0, left: 0, right: 100, bottom: 50 }),
+      getBoundingBox: vi.fn().mockImplementation((nodeId: string) => {
+        // Return bounding box around the node position with ~50px height
+        const pos = allPositions[nodeId] || { x: 0, y: 0 };
+        return { top: pos.y - 25, left: pos.x - 50, right: pos.x + 50, bottom: pos.y + 25 };
+      }),
       canvasToDOM: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
       DOMtoCanvas: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
       body: {
