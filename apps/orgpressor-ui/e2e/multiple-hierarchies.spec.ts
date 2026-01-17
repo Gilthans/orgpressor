@@ -3,13 +3,11 @@ import {
   setupPage,
   getCanvas,
   drag,
-  snapOutNode,
   waitForStableLayout,
   expectLayoutChanged,
   snapOutAndConnectTo,
   makeRoot,
   connectToRootPosition,
-  TOP_BAR_CENTER_Y,
   NODE_POSITIONS,
 } from "./test-utils";
 

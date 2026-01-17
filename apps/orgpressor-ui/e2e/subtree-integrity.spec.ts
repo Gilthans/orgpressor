@@ -2,15 +2,12 @@ import { test, expect } from "@playwright/test";
 import {
   setupPage,
   getCanvas,
-  getCanvasSnapshot,
   snapOutNode,
   drag,
   waitForStableLayout,
   expectLayoutChanged,
   snapOutAndConnectTo,
-  snapOutAndConnectToPosition,
   TOP_BAR_CENTER_Y,
-  NODE_POSITIONS,
 } from "./test-utils";
 
 test.describe("Subtree Integrity", () => {

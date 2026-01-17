@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import {
   setupPage,
   getCanvas,
-  getCanvasSnapshot,
   drag,
   snapOutNode,
   waitForStableLayout,
@@ -21,7 +20,7 @@ test.describe("Root Node Behavior", () => {
     const johnPos = NODE_POSITIONS["John Smith"];
 
     // Drag John left within the top bar
-    const { after: afterLeft } = await expectLayoutChanged(page, async () => {
+    await expectLayoutChanged(page, async () => {
       await drag(page, johnPos.x, johnPos.y, johnPos.x - 100, johnPos.y);
     });
 
