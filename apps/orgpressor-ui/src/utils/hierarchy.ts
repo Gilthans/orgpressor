@@ -27,7 +27,9 @@ export function getSnappedNodeIds(
 }
 
 /**
- * Check if a node is free (not part of hierarchy)
+ * Check if a node is free (not part of hierarchy).
+ * A node is free if it has no parent and is not a root.
+ * Having children does not make a node "snapped".
  */
 export function isNodeFree(
   nodeId: string,
@@ -37,10 +39,11 @@ export function isNodeFree(
   const node = nodesDataSet.get(nodeId);
   if (node?.isRoot) return false;
 
-  const connectedEdges = edgesDataSet.get({
-    filter: (edge) => edge.from === nodeId || edge.to === nodeId,
+  // Check for parent edge (where this node is the child/target)
+  const parentEdges = edgesDataSet.get({
+    filter: (edge) => edge.to === nodeId,
   });
-  return connectedEdges.length === 0;
+  return parentEdges.length === 0;
 }
 
 /**
@@ -88,4 +91,47 @@ export function getConnectedEdges(
   return edgesDataSet.get({
     filter: (edge) => edge.from === nodeId || edge.to === nodeId,
   }) as VisEdge[];
+}
+
+/**
+ * Get IDs of all descendants (children, grandchildren, etc.) of a node.
+ * Throws an error if a cycle is detected in the hierarchy.
+ */
+export function getAllDescendantIds(
+  nodeId: string,
+  edgesDataSet: DataSet<VisEdge>
+): string[] {
+  const visited = new Set<string>([nodeId]);
+  const descendants: string[] = [];
+  const queue = [nodeId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const children = getChildNodeIds(currentId, edgesDataSet);
+    children.forEach((childId) => {
+      if (visited.has(childId)) {
+        throw new Error(
+          `Cycle detected in hierarchy: node "${childId}" appears multiple times`
+        );
+      }
+      visited.add(childId);
+      descendants.push(childId);
+      queue.push(childId);
+    });
+  }
+
+  return descendants;
+}
+
+/**
+ * Get the edge from a node's parent (where this node is the 'to')
+ */
+export function getParentEdge(
+  nodeId: string,
+  edgesDataSet: DataSet<VisEdge>
+): VisEdge | null {
+  const edges = edgesDataSet.get({
+    filter: (edge) => edge.to === nodeId,
+  });
+  return edges.length > 0 ? (edges[0] as VisEdge) : null;
 }

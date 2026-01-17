@@ -29,4 +29,6 @@ export interface DragState {
   snappedOut: boolean;
   highlightedNodeId: string | null;
   isOverTopBar: boolean;
+  descendantIds: string[];
+  relativePositions: Record<string, { dx: number; dy: number }>;
 }

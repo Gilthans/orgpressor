@@ -10,6 +10,7 @@ describe("useNodeDrag", () => {
   let mockNodesDataSet: DataSet<VisNode>;
   let mockEdgesDataSet: DataSet<VisEdge>;
   let eventHandlers: Record<string, Function>;
+  let allEdges: { id: string; from: string; to: string }[];
 
   const setupHook = () => {
     renderHook(() =>
@@ -64,6 +65,8 @@ describe("useNodeDrag", () => {
 
   beforeEach(() => {
     eventHandlers = {};
+    // Edge from 1 to 2 means node 2 is a child of node 1
+    allEdges = [{ id: "1-2", from: "1", to: "2" }];
 
     mockNetwork = {
       on: vi.fn((event: string, handler: Function) => {
@@ -101,72 +104,162 @@ describe("useNodeDrag", () => {
     } as unknown as DataSet<VisNode>;
 
     mockEdgesDataSet = {
-      get: vi.fn().mockReturnValue([{ id: "1-2", from: "1", to: "2" }]),
+      get: vi.fn().mockImplementation(
+        (options?: { filter: (edge: { id: string; from: string; to: string }) => boolean }) => {
+          if (options?.filter) {
+            return allEdges.filter(options.filter);
+          }
+          return allEdges;
+        }
+      ),
       remove: vi.fn(),
     } as unknown as DataSet<VisEdge>;
   });
 
-  describe("connected nodes (nodes with edges)", () => {
+  describe("nodes with a parent (connected)", () => {
     it("applies rubber band effect when dragged vertically within threshold", () => {
+      // Node 2 has a parent (node 1), so it should have rubber band
       setupHook();
 
-      const startY = 200;
-      const dragY = 230; // 30px drag, within threshold
-      simulateDrag("1", startY, 150, dragY);
+      const startY = 300; // Node 2's position
+      const dragY = 330; // 30px drag, within threshold
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 250, y: dragY } },
+      });
 
       const expectedY = startY + (dragY - startY) * RUBBER_BAND_FACTOR;
 
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "1",
-          x: 150,
-          y: expectedY,
-        })
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2",
+            x: 250,
+            y: expectedY,
+          }),
+        ])
       );
     });
 
-    it("snaps back to original Y position when drag ends within threshold", () => {
+    it("snaps back Y but keeps X when drag ends within threshold", () => {
+      // Node 2 has a parent (node 1), so it should snap back
       setupHook();
 
-      const startY = 200;
-      simulateDrag("1", startY, 150, 230);
+      const startY = 300;
+      const dragX = 250;
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: dragX, y: 330 } },
+      });
 
       vi.mocked(mockNodesDataSet.update).mockClear();
       mockNetwork.getPositions = vi.fn().mockReturnValue({
-        "1": { x: 150, y: 204.5 }, // Current rubber-banded position
+        "2": { x: dragX, y: startY + 30 * RUBBER_BAND_FACTOR },
       });
 
-      simulateDragEnd("1");
+      eventHandlers["dragEnd"]({ nodes: ["2"] });
 
+      // Keeps X position but snaps Y back to original
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "1",
-          y: startY, // Snaps back to original
-        })
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2",
+            x: dragX, // Keeps current X
+            y: startY, // Snaps back to original Y
+          }),
+        ])
       );
     });
 
-    it("disconnects from hierarchy when dragged past threshold", () => {
+    it("disconnects child node from parent when dragged past threshold", () => {
+      // Set up: node 2 is a child of node 1
+      // When we drag node 2 (the child), it should remove edge "1-2"
       setupHook();
 
-      const startY = 200;
+      const startY = 300; // Node 2's Y position
       const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
-      simulateDrag("1", startY, 150, dragY);
+
+      // Drag node 2 (the child)
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 250, y: dragY } },
+      });
 
       expect(mockEdgesDataSet.remove).toHaveBeenCalledWith("1-2");
     });
 
-    it("preserves other nodes positions when disconnecting", () => {
+    it("preserves other nodes positions when child disconnects", () => {
       setupHook();
 
-      const startY = 200;
+      const startY = 300; // Node 2's Y position
       const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
-      simulateDrag("1", startY, 150, dragY);
 
-      // Other nodes should be updated with their original positions
+      // Drag node 2 (the child) - it has no descendants
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 250, y: dragY } },
+      });
+
+      // Other nodes (1 and 3) should be restored to their original positions
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ id: "2", x: 200, y: 300 }),
+          expect.objectContaining({ id: "1", x: 100, y: 200 }),
           expect.objectContaining({ id: "3", x: 300, y: 300 }),
         ])
       );
@@ -175,44 +268,107 @@ describe("useNodeDrag", () => {
     it("moves freely (no rubber band) after disconnecting", () => {
       setupHook();
 
-      const startY = 200;
-      // First drag past threshold to disconnect
-      simulateDrag("1", startY, 150, startY + SNAP_OUT_THRESHOLD + 50);
+      const startY = 300;
+      // Drag node 2 past threshold to disconnect
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 250, y: startY + SNAP_OUT_THRESHOLD + 50 } },
+      });
 
       vi.mocked(mockNodesDataSet.update).mockClear();
 
       // Continue dragging
       eventHandlers["dragging"]({
-        nodes: ["1"],
+        nodes: ["2"],
         pointer: { canvas: { x: 300, y: 500 } },
       });
 
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "1",
-          x: 300,
-          y: 500, // Exact pointer position, no rubber band
-        })
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2",
+            x: 300,
+            y: 500, // Exact pointer position, no rubber band
+          }),
+        ])
       );
     });
 
     it("stays at dropped position after disconnecting (no snap back)", () => {
       setupHook();
 
-      const startY = 200;
-      simulateDrag("1", startY, 150, startY + SNAP_OUT_THRESHOLD + 50);
+      const startY = 300;
+      // Drag node 2 past threshold to disconnect
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: 200, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: 250, y: startY + SNAP_OUT_THRESHOLD + 50 } },
+      });
 
       vi.mocked(mockNodesDataSet.update).mockClear();
 
-      simulateDragEnd("1");
+      simulateDragEnd("2");
 
       expect(mockNodesDataSet.update).not.toHaveBeenCalled();
+    });
+
+    it("moves subtree together when dragging parent (free movement)", () => {
+      // Node 1 has children but no parent, so it moves freely
+      // But its children should still move with it
+      setupHook();
+
+      const startY = 200;
+      const dragY = 230;
+      const dragX = 150;
+      simulateDrag("1", startY, dragX, dragY);
+
+      // Node 1 moves freely (no rubber band since it has no parent)
+      // Child should move with same relative offset
+      const childRelativeY = 300 - 200; // Node 2 is 100 below Node 1
+      const childRelativeX = 200 - 100; // Node 2 is 100 to the right of Node 1
+
+      expect(mockNodesDataSet.update).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "1", x: dragX, y: dragY }), // Free movement
+          expect.objectContaining({ id: "2", x: dragX + childRelativeX, y: dragY + childRelativeY }),
+        ])
+      );
     });
   });
 
   describe("free nodes (nodes without edges)", () => {
     beforeEach(() => {
-      mockEdgesDataSet.get = vi.fn().mockReturnValue([]);
+      allEdges = [];
+      mockEdgesDataSet.get = vi.fn().mockImplementation(() => {
+        return []; // No edges
+      });
     });
 
     it("moves freely without rubber band effect", () => {
@@ -221,11 +377,13 @@ describe("useNodeDrag", () => {
       simulateDrag("1", 200, 300, 400);
 
       expect(mockNodesDataSet.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "1",
-          x: 300,
-          y: 400, // Exact pointer position
-        })
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "1",
+            x: 300,
+            y: 400, // Exact pointer position
+          }),
+        ])
       );
     });
 
