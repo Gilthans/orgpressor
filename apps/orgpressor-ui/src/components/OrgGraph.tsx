@@ -7,19 +7,31 @@ interface OrgGraphProps {
   edges: HierarchyEdge[];
 }
 
+interface VisNode {
+  id: string;
+  label: string;
+  x?: number;
+  y?: number;
+}
+
+const RUBBER_BAND_FACTOR = 0.15;
+
 export function OrgGraph({ nodes, edges }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
+  const nodesDataSetRef = useRef<DataSet<VisNode> | null>(null);
+  const dragStartPos = useRef<{ nodeId: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const visNodes = new DataSet(
+    const visNodes = new DataSet<VisNode>(
       nodes.map((node) => ({
         id: node.id,
         label: node.label,
       }))
     );
+    nodesDataSetRef.current = visNodes;
 
     const visEdges = new DataSet(
       edges.map((edge) => ({
@@ -69,14 +81,69 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
       },
     };
 
-    networkRef.current = new Network(
+    const network = new Network(
       containerRef.current,
       { nodes: visNodes, edges: visEdges },
       options
     );
+    networkRef.current = network;
+
+    // Capture original position on drag start
+    network.on("dragStart", (params) => {
+      if (params.nodes.length === 1) {
+        const nodeId = params.nodes[0] as string;
+        const positions = network.getPositions([nodeId]);
+        dragStartPos.current = {
+          nodeId,
+          x: positions[nodeId].x,
+          y: positions[nodeId].y,
+        };
+      }
+    });
+
+    // Apply rubber band effect during drag
+    network.on("dragging", (params) => {
+      if (!dragStartPos.current || params.nodes.length !== 1) return;
+
+      const nodeId = params.nodes[0] as string;
+      if (nodeId !== dragStartPos.current.nodeId) return;
+
+      const pointer = params.pointer.canvas;
+      const originalY = dragStartPos.current.y;
+
+      // Rubber band: node moves freely in X, but Y is constrained
+      const yOffset = pointer.y - originalY;
+      const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
+
+      visNodes.update({
+        id: nodeId,
+        label: visNodes.get(nodeId)?.label || "",
+        x: pointer.x,
+        y: rubberBandY,
+      });
+    });
+
+    // Snap back to original Y on drag end
+    network.on("dragEnd", (params) => {
+      if (!dragStartPos.current || params.nodes.length !== 1) return;
+
+      const nodeId = params.nodes[0] as string;
+      if (nodeId !== dragStartPos.current.nodeId) return;
+
+      const currentPos = network.getPositions([nodeId])[nodeId];
+
+      visNodes.update({
+        id: nodeId,
+        label: visNodes.get(nodeId)?.label || "",
+        x: currentPos.x,
+        y: dragStartPos.current.y,
+      });
+
+      dragStartPos.current = null;
+    });
 
     return () => {
-      networkRef.current?.destroy();
+      network.destroy();
     };
   }, [nodes, edges]);
 
