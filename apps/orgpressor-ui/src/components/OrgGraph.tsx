@@ -19,12 +19,6 @@ import { extractGraphState } from "../utils/graphState";
 import { TopBar } from "./TopBar";
 import { EditNodeDialog } from "./EditNodeDialog";
 
-// Expose accessor for e2e testing
-declare global {
-  interface Window {
-    __GRAPH_ACCESSOR__?: GraphAccessor;
-  }
-}
 
 /**
  * Creates a GraphAccessor from vis-network internals.
@@ -154,16 +148,7 @@ export function OrgGraph({ nodes, edges, onChange, onReady }: OrgGraphProps) {
   useEffect(() => {
     if (network && nodesDataSet && edgesDataSet) {
       const accessor = createGraphAccessor(network, nodesDataSet, edgesDataSet);
-
-      // Notify consumer via callback
       onReady?.(accessor);
-
-      // Expose for e2e testing
-      window.__GRAPH_ACCESSOR__ = accessor;
-
-      return () => {
-        delete window.__GRAPH_ACCESSOR__;
-      };
     }
   }, [network, nodesDataSet, edgesDataSet, onReady]);
 
