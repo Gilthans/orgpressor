@@ -31,6 +31,7 @@ class MockNetwork {
   off = vi.fn();
   destroy = vi.fn();
   getPositions = vi.fn().mockReturnValue({});
+  getBoundingBox = vi.fn().mockReturnValue({ top: 0, left: 0, right: 100, bottom: 50 });
 }
 
 // Mock vis-network

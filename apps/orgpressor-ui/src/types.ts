@@ -26,4 +26,5 @@ export interface DragState {
   originalX: number;
   originalY: number;
   snappedOut: boolean;
+  highlightedNodeId: string | null;
 }

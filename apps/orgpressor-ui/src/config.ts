@@ -3,6 +3,18 @@ import type { Options } from "vis-network";
 export const RUBBER_BAND_FACTOR = 0.15;
 export const SNAP_OUT_THRESHOLD = 150;
 
+// Highlight color for potential parent nodes during drag
+export const HIGHLIGHT_COLOR = {
+  background: "#c8e6c9",
+  border: "#388e3c",
+};
+
+// Default node color (for resetting after highlight)
+export const DEFAULT_NODE_COLOR = {
+  background: "#e3f2fd",
+  border: "#1976d2",
+};
+
 // Layout settings for free nodes
 export const FREE_NODES_TOP_MARGIN = 150;
 export const FREE_NODES_SPACING = 120;

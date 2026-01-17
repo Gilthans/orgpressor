@@ -78,6 +78,7 @@ describe("useNodeDrag", () => {
         });
         return result;
       }),
+      getBoundingBox: vi.fn().mockReturnValue({ top: 0, left: 0, right: 100, bottom: 50 }),
       destroy: vi.fn(),
     } as unknown as Network;
 
