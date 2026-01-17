@@ -1,4 +1,5 @@
 import type { Network, DataSet } from "vis-network/standalone";
+import { updateNode } from "../types";
 import type { VisNode } from "../types";
 
 export type NodePositions = Record<string, { x: number; y: number }>;
@@ -43,14 +44,12 @@ export function createPositionUpdates(
   return nodesDataSet
     .get()
     .filter((node) => !excludeSet.has(node.id))
-    .map((node) => ({
-      id: node.id,
-      name: node.name,
-      label: node.label,
-      metadata: node.metadata,
-      x: positions[node.id]?.x ?? 0,
-      y: positions[node.id]?.y ?? 0,
-    }));
+    .map((node) =>
+      updateNode(node, {
+        x: positions[node.id]?.x ?? 0,
+        y: positions[node.id]?.y ?? 0,
+      })
+    );
 }
 
 /**

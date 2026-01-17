@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Network, DataSet } from "vis-network/standalone";
+import { updateNode } from "../types";
 import type { VisNode, VisEdge, DragState } from "../types";
 import {
   RUBBER_BAND_FACTOR,
@@ -45,13 +46,7 @@ function setNodeHighlight(
 ): void {
   const node = nodesDataSet.get(nodeId);
   if (node) {
-    nodesDataSet.update({
-      id: nodeId,
-      name: node.name,
-      label: node.label,
-      metadata: node.metadata,
-      color,
-    } as VisNode);
+    nodesDataSet.update(updateNode(node, { color }));
   }
 }
 
@@ -332,13 +327,7 @@ export function useNodeDrag({
         // Clear isRoot if this was a root node
         const node = nodesDataSet.get(nodeId);
         if (node?.isRoot) {
-          nodesDataSet.update({
-            id: nodeId,
-            name: node.name,
-            label: node.label,
-            metadata: node.metadata,
-            isRoot: false,
-          });
+          nodesDataSet.update(updateNode(node, { isRoot: false }));
         }
 
         // Restore positions of nodes NOT in subtree

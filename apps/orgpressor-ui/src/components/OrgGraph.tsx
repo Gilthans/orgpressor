@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { formatNodeLabel } from "../types";
+import { formatNodeLabel, updateNode } from "../types";
 import type { PersonNode, HierarchyEdge, NodeMetadata } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
@@ -64,12 +64,12 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
 
       const node = nodesDataSet.get(editingNodeId);
       if (node) {
-        nodesDataSet.update({
-          id: editingNodeId,
-          name: node.name,
-          label: formatNodeLabel(node.name, metadata),
-          metadata,
-        });
+        nodesDataSet.update(
+          updateNode(node, {
+            label: formatNodeLabel(node.name, metadata),
+            metadata,
+          })
+        );
       }
       setEditingNodeId(null);
     },

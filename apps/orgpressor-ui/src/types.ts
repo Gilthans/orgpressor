@@ -21,6 +21,7 @@ export interface VisNode {
   x?: number;
   y?: number;
   isRoot?: boolean;
+  color?: { background: string; border: string }; // For highlighting
 }
 
 /**
@@ -29,6 +30,20 @@ export interface VisNode {
 export function formatNodeLabel(name: string, metadata?: NodeMetadata): string {
   if (!metadata?.role) return name;
   return `<b>${metadata.role}</b>\n${name}`;
+}
+
+/**
+ * Creates a node update object, preserving essential fields (name, label, metadata).
+ * Use this when updating nodes to avoid accidentally losing data.
+ */
+export function updateNode(node: VisNode, changes: Partial<VisNode>): VisNode {
+  return {
+    id: node.id,
+    name: node.name,
+    label: node.label,
+    metadata: node.metadata,
+    ...changes,
+  };
 }
 
 export interface VisEdge {
