@@ -12,14 +12,36 @@ importers:
         specifier: ^2
         version: 2.7.5
 
-  apps/orgpressor-ui:
+  apps/demo:
     dependencies:
+      orgpressor-ui:
+        specifier: workspace:*
+        version: link:../orgpressor-ui
       react:
         specifier: ^18.3.1
         version: 18.3.1
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.27)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.3
+        version: 4.7.0(vite@5.4.21)
+      typescript:
+        specifier: ~5.6.2
+        version: 5.6.3
+      vite:
+        specifier: ^5.4.10
+        version: 5.4.21
+
+  apps/orgpressor-ui:
+    dependencies:
       vis-data:
         specifier: ^8.0.3
         version: 8.0.3(uuid@13.0.0)(vis-util@6.0.0(@egjs/hammerjs@2.0.17)(component-emitter@2.0.0))
@@ -66,6 +88,12 @@ importers:
       jsdom:
         specifier: ^27.4.0
         version: 27.4.0
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: ~5.6.2
         version: 5.6.3
