@@ -11,9 +11,17 @@ interface OrgGraphProps {
   nodes: PersonNode[];
   edges: HierarchyEdge[];
   onChange?: (data: GraphChangeData) => void;
+  selectedNodeId?: string | null;
+  onSelectedNodeChange?: (nodeId: string | null) => void;
 }
 
-export function OrgGraph({ nodes, edges, onChange }: OrgGraphProps) {
+export function OrgGraph({
+  nodes,
+  edges,
+  onChange,
+  selectedNodeId,
+  onSelectedNodeChange,
+}: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -67,6 +75,37 @@ export function OrgGraph({ nodes, edges, onChange }: OrgGraphProps) {
       network.off("doubleClick", handleDoubleClick);
     };
   }, [network]);
+
+  // Handle node selection changes from vis-network
+  useEffect(() => {
+    if (!network) return;
+
+    const handleClick = (params: { nodes: (string | number)[] }) => {
+      const newSelectedId = params.nodes.length === 1 ? (params.nodes[0] as string) : null;
+      onSelectedNodeChange?.(newSelectedId);
+    };
+
+    network.on("click", handleClick);
+    return () => {
+      network.off("click", handleClick);
+    };
+  }, [network, onSelectedNodeChange]);
+
+  // Sync external selectedNodeId to vis-network
+  useEffect(() => {
+    if (!network) return;
+
+    const currentSelection = network.getSelectedNodes();
+    const currentSelectedId = currentSelection.length === 1 ? currentSelection[0] : null;
+
+    if (selectedNodeId !== currentSelectedId) {
+      if (selectedNodeId) {
+        network.selectNodes([selectedNodeId]);
+      } else {
+        network.unselectAll();
+      }
+    }
+  }, [network, selectedNodeId]);
 
   const handleSaveMetadata = useCallback(
     (metadata: NodeMetadata) => {

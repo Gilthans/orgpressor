@@ -133,6 +133,10 @@ declare module "vis-network/standalone" {
     canvasToDOM(position: Position): Position;
     DOMtoCanvas(position: Position): Position;
 
+    getSelectedNodes(): (string | number)[];
+    selectNodes(nodeIds: (string | number)[]): void;
+    unselectAll(): void;
+
     destroy(): void;
   }
 }
