@@ -14,7 +14,6 @@ import {
   getSnappedNodeIds,
   isNodeFree,
   getChildNodeIds,
-  getAllDescendantIds,
   getParentEdge,
 } from "../utils/hierarchy";
 import {
@@ -24,6 +23,11 @@ import {
   boxesOverlap,
 } from "../utils/positions";
 import { canvasToDOMY, domToCanvasY } from "../utils/network";
+import {
+  captureSubtree,
+  createSubtreeMoveUpdates,
+  getSubtreeNodeIds,
+} from "../utils/subtree";
 
 interface UseNodeDragProps {
   network: Network | null;
@@ -57,36 +61,29 @@ function resetNodeHighlight(nodesDataSet: DataSet<VisNode>, nodeId: string): voi
 
 function handleSnapBack(
   nodesDataSet: DataSet<VisNode>,
-  nodeId: string,
-  currentX: number,
-  originalX: number,
-  originalY: number,
-  descendantIds: string[],
-  relativePositions: Record<string, { dx: number; dy: number }>
+  dragState: DragState,
+  currentX: number
 ): void {
-  // Keep current X position but snap Y back to original
-  const updates: VisNode[] = [
-    {
-      id: nodeId,
-      label: nodesDataSet.get(nodeId)?.label || "",
-      x: currentX,
-      y: originalY,
-    },
-  ];
-
-  // Calculate X offset from original position
+  const { originalX, originalY, subtree } = dragState;
   const xOffset = currentX - originalX;
 
-  // Snap descendants: apply same X offset, but restore original Y positions
-  descendantIds.forEach((id) => {
-    const rel = relativePositions[id];
-    if (rel) {
-      updates.push({
-        id,
-        label: nodesDataSet.get(id)?.label || "",
-        x: originalX + rel.dx + xOffset,
-        y: originalY + rel.dy,
-      });
+  // Create updates with X offset applied but Y restored to original
+  const updates = createSubtreeMoveUpdates(
+    nodesDataSet,
+    subtree,
+    currentX,
+    originalY
+  );
+
+  // Adjust descendant X positions to include the offset
+  // (The root is already at currentX, descendants need offset from originalX)
+  updates.forEach((update, index) => {
+    if (index > 0) {
+      // Skip root node, adjust descendants
+      const rel = subtree.relativePositions[update.id];
+      if (rel) {
+        update.x = originalX + rel.dx + xOffset;
+      }
     }
   });
 
@@ -96,10 +93,9 @@ function handleSnapBack(
 function handleCreateRoot(
   network: Network,
   nodesDataSet: DataSet<VisNode>,
-  nodeId: string,
-  descendantIds: string[],
-  relativePositions: Record<string, { dx: number; dy: number }>
+  dragState: DragState
 ): void {
+  const { subtree } = dragState;
   const positions = captureAllPositions(network, nodesDataSet);
   const existingRoots = nodesDataSet.get().filter((n) => n.isRoot);
   const existingRootIds = existingRoots.map((r) => r.id);
@@ -121,29 +117,14 @@ function handleCreateRoot(
     rootY = domToCanvasY(network, TOP_BAR_HEIGHT / 2);
   }
 
-  // Update the root node
-  const updates: VisNode[] = [
-    {
-      id: nodeId,
-      label: nodesDataSet.get(nodeId)?.label || "",
-      x: newRootX,
-      y: rootY,
-      isRoot: true,
-    },
-  ];
-
-  // Move all descendants maintaining relative positions
-  descendantIds.forEach((id) => {
-    const rel = relativePositions[id];
-    if (rel) {
-      updates.push({
-        id,
-        label: nodesDataSet.get(id)?.label || "",
-        x: newRootX + rel.dx,
-        y: rootY + rel.dy,
-      });
-    }
-  });
+  // Move subtree to root position
+  const updates = createSubtreeMoveUpdates(
+    nodesDataSet,
+    subtree,
+    newRootX,
+    rootY,
+    { isRoot: true }
+  );
 
   nodesDataSet.update(updates);
 }
@@ -152,11 +133,10 @@ function handleSnapToParent(
   network: Network,
   nodesDataSet: DataSet<VisNode>,
   edgesDataSet: DataSet<VisEdge>,
-  nodeId: string,
-  parentId: string,
-  descendantIds: string[],
-  relativePositions: Record<string, { dx: number; dy: number }>
+  dragState: DragState,
+  parentId: string
 ): void {
+  const { subtree } = dragState;
   const positions = captureAllPositions(network, nodesDataSet);
   const parentPos = positions[parentId];
 
@@ -169,9 +149,9 @@ function handleSnapToParent(
 
   // Add the edge
   edgesDataSet.add({
-    id: `${parentId}-${nodeId}`,
+    id: `${parentId}-${subtree.rootId}`,
     from: parentId,
-    to: nodeId,
+    to: subtree.rootId,
   });
 
   // Calculate the new position for the dropped node
@@ -179,35 +159,22 @@ function handleSnapToParent(
   const newNodeY = parentPos.y + LEVEL_SEPARATION;
 
   // Restore all existing node positions (excluding the subtree being moved)
-  const subtreeIds = new Set([nodeId, ...descendantIds]);
+  const subtreeIds = getSubtreeNodeIds(subtree);
   const positionUpdates = createPositionUpdates(
     nodesDataSet,
     positions,
     Array.from(subtreeIds)
   );
 
-  // Position the dropped node
-  positionUpdates.push({
-    id: nodeId,
-    label: nodesDataSet.get(nodeId)?.label || "",
-    x: newNodeX,
-    y: newNodeY,
-  });
+  // Add subtree move updates
+  const subtreeUpdates = createSubtreeMoveUpdates(
+    nodesDataSet,
+    subtree,
+    newNodeX,
+    newNodeY
+  );
 
-  // Move all descendants with the same offset
-  descendantIds.forEach((id) => {
-    const rel = relativePositions[id];
-    if (rel) {
-      positionUpdates.push({
-        id,
-        label: nodesDataSet.get(id)?.label || "",
-        x: newNodeX + rel.dx,
-        y: newNodeY + rel.dy,
-      });
-    }
-  });
-
-  nodesDataSet.update(positionUpdates);
+  nodesDataSet.update([...positionUpdates, ...subtreeUpdates]);
 }
 
 // --- Main Hook ---
@@ -228,33 +195,16 @@ export function useNodeDrag({
 
       const nodeId = params.nodes[0] as string;
       const isFree = isNodeFree(nodeId, nodesDataSet, edgesDataSet);
-
-      // Get all descendants and their positions relative to the dragged node
-      const descendantIds = getAllDescendantIds(nodeId, edgesDataSet);
-      const allNodeIds = [nodeId, ...descendantIds];
-      const positions = network.getPositions(allNodeIds);
-
-      const nodePos = positions[nodeId];
-      const relativePositions: Record<string, { dx: number; dy: number }> = {};
-      descendantIds.forEach((id) => {
-        const pos = positions[id];
-        if (pos) {
-          relativePositions[id] = {
-            dx: pos.x - nodePos.x,
-            dy: pos.y - nodePos.y,
-          };
-        }
-      });
+      const subtree = captureSubtree(network, edgesDataSet, nodeId);
+      const positions = network.getPositions([nodeId]);
 
       dragState.current = {
-        nodeId,
-        originalX: nodePos.x,
-        originalY: nodePos.y,
+        originalX: positions[nodeId].x,
+        originalY: positions[nodeId].y,
         snappedOut: isFree,
         highlightedNodeId: null,
         isOverTopBar: false,
-        descendantIds,
-        relativePositions,
+        subtree,
       };
     };
 
@@ -265,7 +215,7 @@ export function useNodeDrag({
       if (!dragState.current || params.nodes.length !== 1) return;
 
       const nodeId = params.nodes[0] as string;
-      if (nodeId !== dragState.current.nodeId) return;
+      if (nodeId !== dragState.current.subtree.rootId) return;
 
       const pointer = params.pointer.canvas;
       const { originalY, snappedOut } = dragState.current;
@@ -281,38 +231,22 @@ export function useNodeDrag({
       nodeId: string,
       pointer: { x: number; y: number }
     ) => {
-      const { descendantIds, relativePositions } = dragState.current!;
+      const { subtree } = dragState.current!;
 
-      // Move parent node freely
-      const updates: VisNode[] = [
-        {
-          id: nodeId,
-          label: nodesDataSet.get(nodeId)?.label || "",
-          x: pointer.x,
-          y: pointer.y,
-        },
-      ];
-
-      // Move all descendants maintaining relative positions
-      descendantIds.forEach((id) => {
-        const rel = relativePositions[id];
-        if (rel) {
-          updates.push({
-            id,
-            label: nodesDataSet.get(id)?.label || "",
-            x: pointer.x + rel.dx,
-            y: pointer.y + rel.dy,
-          });
-        }
-      });
-
+      // Move subtree freely
+      const updates = createSubtreeMoveUpdates(
+        nodesDataSet,
+        subtree,
+        pointer.x,
+        pointer.y
+      );
       nodesDataSet.update(updates);
 
       // Check for overlap with snapped nodes FIRST (takes priority over top bar)
-      // Exclude the dragged node and its descendants from potential drop targets
+      // Exclude the dragged subtree from potential drop targets
       const draggedBox = network.getBoundingBox(nodeId);
       const snappedIds = getSnappedNodeIds(nodesDataSet, edgesDataSet);
-      const subtreeIds = new Set([nodeId, ...descendantIds]);
+      const subtreeIds = getSubtreeNodeIds(subtree);
       let newHighlightedId: string | null = null;
 
       for (const snappedId of snappedIds) {
@@ -360,7 +294,7 @@ export function useNodeDrag({
       pointer: { x: number; y: number },
       originalY: number
     ) => {
-      const { descendantIds, relativePositions } = dragState.current!;
+      const { subtree } = dragState.current!;
       const yOffset = pointer.y - originalY;
       const distance = Math.abs(yOffset);
 
@@ -385,7 +319,7 @@ export function useNodeDrag({
         }
 
         // Restore positions of nodes NOT in subtree
-        const subtreeIds = new Set([nodeId, ...descendantIds]);
+        const subtreeIds = getSubtreeNodeIds(subtree);
         const positionUpdates = createPositionUpdates(
           nodesDataSet,
           positions,
@@ -396,52 +330,33 @@ export function useNodeDrag({
         dragState.current!.snappedOut = true;
 
         // Move subtree to pointer position
-        const subtreeUpdates: VisNode[] = [
-          {
-            id: nodeId,
-            label: nodesDataSet.get(nodeId)?.label || "",
-            x: pointer.x,
-            y: pointer.y,
-          },
-        ];
-
-        descendantIds.forEach((id) => {
-          const rel = relativePositions[id];
-          if (rel) {
-            subtreeUpdates.push({
-              id,
-              label: nodesDataSet.get(id)?.label || "",
-              x: pointer.x + rel.dx,
-              y: pointer.y + rel.dy,
-            });
-          }
-        });
-
+        const subtreeUpdates = createSubtreeMoveUpdates(
+          nodesDataSet,
+          subtree,
+          pointer.x,
+          pointer.y
+        );
         nodesDataSet.update(subtreeUpdates);
       } else {
         // Rubber band effect - move entire subtree
         const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
         const xOffset = pointer.x - dragState.current!.originalX;
 
-        const updates: VisNode[] = [
-          {
-            id: nodeId,
-            label: nodesDataSet.get(nodeId)?.label || "",
-            x: pointer.x,
-            y: rubberBandY,
-          },
-        ];
+        // For rubber band, we need custom positioning since Y is constrained
+        const updates = createSubtreeMoveUpdates(
+          nodesDataSet,
+          subtree,
+          pointer.x,
+          rubberBandY
+        );
 
-        // Move descendants with same offsets
-        descendantIds.forEach((id) => {
-          const rel = relativePositions[id];
-          if (rel) {
-            updates.push({
-              id,
-              label: nodesDataSet.get(id)?.label || "",
-              x: dragState.current!.originalX + xOffset + rel.dx,
-              y: rubberBandY + rel.dy,
-            });
+        // Adjust descendant positions for the X offset
+        updates.forEach((update, index) => {
+          if (index > 0) {
+            const rel = subtree.relativePositions[update.id];
+            if (rel) {
+              update.x = dragState.current!.originalX + xOffset + rel.dx;
+            }
           }
         });
 
@@ -453,17 +368,9 @@ export function useNodeDrag({
       if (!dragState.current || params.nodes.length !== 1) return;
 
       const nodeId = params.nodes[0] as string;
-      if (nodeId !== dragState.current.nodeId) return;
+      if (nodeId !== dragState.current.subtree.rootId) return;
 
-      const {
-        snappedOut,
-        highlightedNodeId,
-        isOverTopBar,
-        originalX,
-        originalY,
-        descendantIds,
-        relativePositions,
-      } = dragState.current;
+      const { snappedOut, highlightedNodeId, isOverTopBar } = dragState.current;
 
       // Reset highlights
       if (isOverTopBar) {
@@ -477,26 +384,16 @@ export function useNodeDrag({
       if (!snappedOut) {
         // Get current X position to preserve horizontal movement
         const currentPos = network.getPositions([nodeId])[nodeId];
-        handleSnapBack(
-          nodesDataSet,
-          nodeId,
-          currentPos.x,
-          originalX,
-          originalY,
-          descendantIds,
-          relativePositions
-        );
+        handleSnapBack(nodesDataSet, dragState.current, currentPos.x);
       } else if (isOverTopBar) {
-        handleCreateRoot(network, nodesDataSet, nodeId, descendantIds, relativePositions);
+        handleCreateRoot(network, nodesDataSet, dragState.current);
       } else if (highlightedNodeId) {
         handleSnapToParent(
           network,
           nodesDataSet,
           edgesDataSet,
-          nodeId,
-          highlightedNodeId,
-          descendantIds,
-          relativePositions
+          dragState.current,
+          highlightedNodeId
         );
       }
 

@@ -22,13 +22,21 @@ export interface VisEdge {
   to: string;
 }
 
+/**
+ * Represents a subtree: a node and all its descendants with their relative positions.
+ * This is the core abstraction for moving nodes with their children.
+ */
+export interface SubtreeContext {
+  rootId: string;
+  descendantIds: string[];
+  relativePositions: Record<string, { dx: number; dy: number }>;
+}
+
 export interface DragState {
-  nodeId: string;
   originalX: number;
   originalY: number;
   snappedOut: boolean;
   highlightedNodeId: string | null;
   isOverTopBar: boolean;
-  descendantIds: string[];
-  relativePositions: Record<string, { dx: number; dy: number }>;
+  subtree: SubtreeContext;
 }
