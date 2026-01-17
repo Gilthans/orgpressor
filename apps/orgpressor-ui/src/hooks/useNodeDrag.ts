@@ -6,6 +6,7 @@ import {
   SNAP_OUT_THRESHOLD,
   HIGHLIGHT_COLOR,
   DEFAULT_NODE_COLOR,
+  TOP_BAR_HEIGHT,
   networkOptions,
 } from "../config";
 
@@ -22,26 +23,56 @@ function boxesOverlap(
   return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 }
 
-// Get IDs of nodes that are part of the hierarchy (have edges)
-function getSnappedNodeIds(edgesDataSet: DataSet<VisEdge>): Set<string> {
+// Get IDs of nodes that are part of the hierarchy (have edges or are roots)
+function getSnappedNodeIds(
+  nodesDataSet: DataSet<VisNode>,
+  edgesDataSet: DataSet<VisEdge>
+): Set<string> {
   const snappedIds = new Set<string>();
+
+  // Add nodes with edges
   edgesDataSet.get().forEach((edge) => {
     snappedIds.add(edge.from);
     snappedIds.add(edge.to);
   });
+
+  // Add root nodes (even if they have no edges)
+  nodesDataSet.get().forEach((node) => {
+    if (node.isRoot) {
+      snappedIds.add(node.id);
+    }
+  });
+
   return snappedIds;
+}
+
+// Check if a node is free (not part of hierarchy)
+function isNodeFree(
+  nodeId: string,
+  nodesDataSet: DataSet<VisNode>,
+  edgesDataSet: DataSet<VisEdge>
+): boolean {
+  const node = nodesDataSet.get(nodeId);
+  if (node?.isRoot) return false;
+
+  const connectedEdges = edgesDataSet.get({
+    filter: (edge) => edge.from === nodeId || edge.to === nodeId,
+  });
+  return connectedEdges.length === 0;
 }
 
 interface UseNodeDragProps {
   network: Network | null;
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
+  onTopBarHighlight?: (highlighted: boolean) => void;
 }
 
 export function useNodeDrag({
   network,
   nodesDataSet,
   edgesDataSet,
+  onTopBarHighlight,
 }: UseNodeDragProps): void {
   const dragState = useRef<DragState | null>(null);
 
@@ -54,18 +85,16 @@ export function useNodeDrag({
       const nodeId = params.nodes[0] as string;
       const positions = network.getPositions([nodeId]);
 
-      // Check if node has any edges - if not, it's already free
-      const connectedEdges = edgesDataSet.get({
-        filter: (edge) => edge.from === nodeId || edge.to === nodeId,
-      });
-      const isAlreadyFree = connectedEdges.length === 0;
+      // Check if node is free (no edges and not a root)
+      const isFree = isNodeFree(nodeId, nodesDataSet, edgesDataSet);
 
       dragState.current = {
         nodeId,
         originalX: positions[nodeId].x,
         originalY: positions[nodeId].y,
-        snappedOut: isAlreadyFree,
+        snappedOut: isFree,
         highlightedNodeId: null,
+        isOverTopBar: false,
       };
     };
 
@@ -90,9 +119,9 @@ export function useNodeDrag({
           y: pointer.y,
         });
 
-        // Check for overlap with snapped nodes (potential parents)
+        // Check for overlap with snapped nodes FIRST (takes priority over top bar)
         const draggedBox = network.getBoundingBox(nodeId);
-        const snappedIds = getSnappedNodeIds(edgesDataSet);
+        const snappedIds = getSnappedNodeIds(nodesDataSet, edgesDataSet);
         let newHighlightedId: string | null = null;
 
         for (const snappedId of snappedIds) {
@@ -105,7 +134,7 @@ export function useNodeDrag({
 
         const prevHighlightedId = dragState.current.highlightedNodeId;
 
-        // Reset previous highlight if it changed
+        // Reset previous node highlight if it changed
         if (prevHighlightedId && prevHighlightedId !== newHighlightedId) {
           const prevNode = nodesDataSet.get(prevHighlightedId);
           if (prevNode) {
@@ -117,7 +146,7 @@ export function useNodeDrag({
           }
         }
 
-        // Apply new highlight
+        // Apply new node highlight
         if (newHighlightedId && newHighlightedId !== prevHighlightedId) {
           const targetNode = nodesDataSet.get(newHighlightedId);
           if (targetNode) {
@@ -130,6 +159,30 @@ export function useNodeDrag({
         }
 
         dragState.current.highlightedNodeId = newHighlightedId;
+
+        // If overlapping a node, turn off top bar highlight and skip top bar check
+        if (newHighlightedId) {
+          if (dragState.current.isOverTopBar) {
+            dragState.current.isOverTopBar = false;
+            onTopBarHighlight?.(false);
+          }
+          return;
+        }
+
+        // No node overlap - check if over top bar zone
+        const container = (network as unknown as { body: { container: HTMLElement } }).body.container;
+        const canvasToDOM = network.canvasToDOM({ x: pointer.x, y: pointer.y });
+        const containerRect = container.getBoundingClientRect();
+        const domY = canvasToDOM.y - containerRect.top;
+
+        const isOverTopBar = domY < TOP_BAR_HEIGHT;
+
+        // Update top bar highlight
+        if (isOverTopBar !== dragState.current.isOverTopBar) {
+          dragState.current.isOverTopBar = isOverTopBar;
+          onTopBarHighlight?.(isOverTopBar);
+        }
+
         return;
       }
 
@@ -147,6 +200,16 @@ export function useNodeDrag({
           filter: (edge) => edge.from === nodeId || edge.to === nodeId,
         });
         connectedEdges.forEach((edge) => edgesDataSet.remove(edge.id));
+
+        // Clear isRoot if this was a root node
+        const node = nodesDataSet.get(nodeId);
+        if (node?.isRoot) {
+          nodesDataSet.update({
+            id: nodeId,
+            label: node.label,
+            isRoot: false,
+          });
+        }
 
         // Restore all node positions (except the dragged node)
         const positionUpdates = allNodeIds
@@ -187,9 +250,14 @@ export function useNodeDrag({
       const nodeId = params.nodes[0] as string;
       if (nodeId !== dragState.current.nodeId) return;
 
-      const { snappedOut, highlightedNodeId } = dragState.current;
+      const { snappedOut, highlightedNodeId, isOverTopBar } = dragState.current;
 
-      // Reset highlight if any
+      // Reset top bar highlight
+      if (isOverTopBar) {
+        onTopBarHighlight?.(false);
+      }
+
+      // Reset node highlight if any
       if (highlightedNodeId) {
         const highlightedNode = nodesDataSet.get(highlightedNodeId);
         if (highlightedNode) {
@@ -209,6 +277,48 @@ export function useNodeDrag({
           label: nodesDataSet.get(nodeId)?.label || "",
           x: currentPos.x,
           y: dragState.current.originalY,
+        });
+      } else if (isOverTopBar) {
+        // Free node dropped in top bar - make it a root
+        const allNodeIds = nodesDataSet.get().map((n) => n.id);
+        const allPositions = network.getPositions(allNodeIds);
+
+        // Find existing roots to position new root to their right
+        const existingRoots = nodesDataSet.get().filter((n) => n.isRoot);
+        let newRootX = 0;
+
+        if (existingRoots.length > 0) {
+          // Find the rightmost root
+          let maxX = -Infinity;
+          existingRoots.forEach((root) => {
+            const rootPos = allPositions[root.id];
+            if (rootPos && rootPos.x > maxX) {
+              maxX = rootPos.x;
+            }
+          });
+          newRootX = maxX + NODE_SPACING;
+        }
+
+        // Get the Y position of existing roots, or calculate centered in top bar
+        let rootY = 0;
+        if (existingRoots.length > 0) {
+          const firstRootPos = allPositions[existingRoots[0].id];
+          if (firstRootPos) {
+            rootY = firstRootPos.y;
+          }
+        } else {
+          // No existing roots - position centered in top bar
+          const topBarCenterInCanvas = network.DOMtoCanvas({ x: 0, y: TOP_BAR_HEIGHT / 2 });
+          rootY = topBarCenterInCanvas.y;
+        }
+
+        // Mark as root and position
+        nodesDataSet.update({
+          id: nodeId,
+          label: nodesDataSet.get(nodeId)?.label || "",
+          x: newRootX,
+          y: rootY,
+          isRoot: true,
         });
       } else if (highlightedNodeId) {
         // Free node dropped on a snapped node - create parent-child edge
@@ -279,5 +389,5 @@ export function useNodeDrag({
       network.off("dragging", handleDragging);
       network.off("dragEnd", handleDragEnd);
     };
-  }, [network, nodesDataSet, edgesDataSet]);
+  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight]);
 }

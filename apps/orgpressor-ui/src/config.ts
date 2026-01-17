@@ -15,6 +15,15 @@ export const DEFAULT_NODE_COLOR = {
   border: "#1976d2",
 };
 
+// Top bar configuration for creating root nodes
+export const TOP_BAR_HEIGHT = 60;
+export const TOP_BAR_COLOR = {
+  background: "rgba(227, 242, 253, 0.3)",
+  border: "#1976d2",
+  highlightBackground: "rgba(200, 230, 201, 0.5)",
+  highlightBorder: "#388e3c",
+};
+
 // Layout settings for free nodes
 export const FREE_NODES_TOP_MARGIN = 150;
 export const FREE_NODES_SPACING = 120;

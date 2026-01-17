@@ -5,6 +5,7 @@ import {
   FREE_NODES_TOP_MARGIN,
   FREE_NODES_SPACING,
   FREE_NODES_PER_ROW,
+  TOP_BAR_HEIGHT,
 } from "../config";
 
 interface UseLayoutProps {
@@ -13,7 +14,8 @@ interface UseLayoutProps {
   edgesDataSet: DataSet<VisEdge>;
 }
 
-const ROOT_TOP_PADDING = 50;
+// Position roots centered vertically inside the top bar
+const ROOT_Y_IN_TOP_BAR = TOP_BAR_HEIGHT / 2;
 
 export function useLayout({
   network,
@@ -29,14 +31,24 @@ export function useLayout({
 
       // Find nodes that are part of the hierarchy (have edges)
       const connectedNodeIds = new Set<string>();
+      const childNodeIds = new Set<string>(); // Nodes that have a parent
       allEdges.forEach((edge) => {
         connectedNodeIds.add(edge.from);
         connectedNodeIds.add(edge.to);
+        childNodeIds.add(edge.to); // 'to' nodes have a parent
+      });
+
+      // Identify root nodes (connected but not a child of anyone)
+      const rootNodeIds = new Set<string>();
+      connectedNodeIds.forEach((id) => {
+        if (!childNodeIds.has(id)) {
+          rootNodeIds.add(id);
+        }
       });
 
       // Separate free nodes from connected nodes
-      const freeNodes = allNodes.filter((node) => !connectedNodeIds.has(node.id));
-      const connectedNodes = allNodes.filter((node) => connectedNodeIds.has(node.id));
+      const freeNodes = allNodes.filter((node) => !connectedNodeIds.has(node.id) && !node.isRoot);
+      const connectedNodes = allNodes.filter((node) => connectedNodeIds.has(node.id) || node.isRoot);
 
       if (connectedNodes.length === 0 && freeNodes.length === 0) return;
 
@@ -59,22 +71,20 @@ export function useLayout({
       if (hierarchyTop === Infinity) hierarchyTop = 0;
       if (hierarchyBottom === -Infinity) hierarchyBottom = 0;
 
-      // Calculate how much to shift all nodes to put roots at top
-      const canvas = network.getViewPosition();
-      const scale = network.getScale();
+      // Calculate how much to shift all nodes to put roots inside the top bar
       const containerHeight = (network as unknown as { body: { container: HTMLElement } }).body.container.clientHeight;
 
-      // Target Y position for roots (in canvas coordinates)
-      // We want roots to be near the top of the visible area
-      const targetRootY = canvas.y - (containerHeight / 2 / scale) + ROOT_TOP_PADDING / scale;
+      // Target Y position for roots (in canvas coordinates) - centered in top bar
+      const targetRootY = network.DOMtoCanvas({ x: 0, y: ROOT_Y_IN_TOP_BAR }).y;
       const yShift = targetRootY - hierarchyTop;
 
-      // Shift all connected nodes
+      // Shift all connected nodes and mark roots
       const connectedUpdates: VisNode[] = connectedNodes.map((node) => ({
         id: node.id,
         label: node.label,
-        x: positions[node.id].x,
-        y: positions[node.id].y + yShift,
+        x: positions[node.id]?.x ?? 0,
+        y: (positions[node.id]?.y ?? 0) + yShift,
+        isRoot: rootNodeIds.has(node.id) || node.isRoot,
       }));
 
       // Position free nodes in a grid below the shifted hierarchy
@@ -121,11 +131,17 @@ export function useLayout({
         const centerX = (minX + maxX) / 2;
         const containerWidth = (network as unknown as { body: { container: HTMLElement } }).body.container.clientWidth;
 
-        // Calculate scale to fit width, but position so roots are at top
+        // Calculate scale to fit width, but position so roots appear in top bar
         const newScale = Math.min(1, containerWidth / (maxX - minX + 200));
 
+        // Position view so that minY (root level) appears at ROOT_Y_IN_TOP_BAR in DOM
+        // viewY is the canvas Y that appears at center of container
+        // We want minY to appear at ROOT_Y_IN_TOP_BAR from top
+        // So: minY should be at (containerHeight/2 - ROOT_Y_IN_TOP_BAR) pixels above center
+        const viewY = minY + (containerHeight / 2 - ROOT_Y_IN_TOP_BAR) / newScale;
+
         network.moveTo({
-          position: { x: centerX, y: minY + (containerHeight / 2 / newScale) - ROOT_TOP_PADDING / newScale },
+          position: { x: centerX, y: viewY },
           scale: newScale,
           animation: { duration: 300, easingFunction: "easeInOutQuad" },
         });

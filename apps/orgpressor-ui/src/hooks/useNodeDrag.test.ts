@@ -79,6 +79,13 @@ describe("useNodeDrag", () => {
         return result;
       }),
       getBoundingBox: vi.fn().mockReturnValue({ top: 0, left: 0, right: 100, bottom: 50 }),
+      canvasToDOM: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
+      DOMtoCanvas: vi.fn().mockImplementation((pos: { x: number; y: number }) => pos),
+      body: {
+        container: {
+          getBoundingClientRect: vi.fn().mockReturnValue({ top: 0, left: 0, width: 800, height: 600 }),
+        },
+      },
       destroy: vi.fn(),
     } as unknown as Network;
 

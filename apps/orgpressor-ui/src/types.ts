@@ -13,6 +13,7 @@ export interface VisNode {
   label: string;
   x?: number;
   y?: number;
+  isRoot?: boolean;
 }
 
 export interface VisEdge {
@@ -27,4 +28,5 @@ export interface DragState {
   originalY: number;
   snappedOut: boolean;
   highlightedNodeId: string | null;
+  isOverTopBar: boolean;
 }
