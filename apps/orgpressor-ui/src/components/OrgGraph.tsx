@@ -1,8 +1,21 @@
-import { useRef, useState, useCallback } from "react";
-import type { PersonNode, HierarchyEdge } from "../types";
+import { useRef, useState, useCallback, useEffect } from "react";
+import type { Network } from "vis-network";
+import type { DataSet } from "vis-data";
+import type { PersonNode, HierarchyEdge, VisNode, VisEdge } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
 import { TopBar } from "./TopBar";
+
+// Expose network for e2e testing
+declare global {
+  interface Window {
+    __TEST_NETWORK__?: {
+      network: Network;
+      nodesDataSet: DataSet<VisNode>;
+      edgesDataSet: DataSet<VisEdge>;
+    };
+  }
+}
 
 interface OrgGraphProps {
   nodes: PersonNode[];
@@ -38,6 +51,16 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
   });
 
   useViewConstraints({ network });
+
+  // Expose network for e2e testing
+  useEffect(() => {
+    if (network && nodesDataSet && edgesDataSet) {
+      window.__TEST_NETWORK__ = { network, nodesDataSet, edgesDataSet };
+      return () => {
+        delete window.__TEST_NETWORK__;
+      };
+    }
+  }, [network, nodesDataSet, edgesDataSet]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
