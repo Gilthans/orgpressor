@@ -14,13 +14,26 @@ interface VisNode {
   y?: number;
 }
 
-const RUBBER_BAND_FACTOR = 0.15;
+interface VisEdge {
+  id: string;
+  from: string;
+  to: string;
+}
 
-export function OrgGraph({ nodes, edges }: OrgGraphProps) {
+const RUBBER_BAND_FACTOR = 0.15;
+const SNAP_OUT_THRESHOLD = 150;
+
+export function OrgGraph({ nodes, edges: initialEdges }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
   const nodesDataSetRef = useRef<DataSet<VisNode> | null>(null);
-  const dragStartPos = useRef<{ nodeId: string; x: number; y: number } | null>(null);
+  const edgesDataSetRef = useRef<DataSet<VisEdge> | null>(null);
+  const dragState = useRef<{
+    nodeId: string;
+    originalX: number;
+    originalY: number;
+    snappedOut: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -33,13 +46,14 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
     );
     nodesDataSetRef.current = visNodes;
 
-    const visEdges = new DataSet(
-      edges.map((edge) => ({
+    const visEdges = new DataSet<VisEdge>(
+      initialEdges.map((edge) => ({
         id: `${edge.from}-${edge.to}`,
         from: edge.from,
         to: edge.to,
       }))
     );
+    edgesDataSetRef.current = visEdges;
 
     const options = {
       layout: {
@@ -93,59 +107,101 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
       if (params.nodes.length === 1) {
         const nodeId = params.nodes[0] as string;
         const positions = network.getPositions([nodeId]);
-        dragStartPos.current = {
+
+        // Check if node has any edges - if not, it's already free
+        const connectedEdges = visEdges.get({
+          filter: (edge) => edge.from === nodeId || edge.to === nodeId,
+        });
+        const isAlreadyFree = connectedEdges.length === 0;
+
+        dragState.current = {
           nodeId,
-          x: positions[nodeId].x,
-          y: positions[nodeId].y,
+          originalX: positions[nodeId].x,
+          originalY: positions[nodeId].y,
+          snappedOut: isAlreadyFree,
         };
       }
     });
 
-    // Apply rubber band effect during drag
+    // Apply rubber band effect during drag, or free movement if snapped out
     network.on("dragging", (params) => {
-      if (!dragStartPos.current || params.nodes.length !== 1) return;
+      if (!dragState.current || params.nodes.length !== 1) return;
 
       const nodeId = params.nodes[0] as string;
-      if (nodeId !== dragStartPos.current.nodeId) return;
+      if (nodeId !== dragState.current.nodeId) return;
 
       const pointer = params.pointer.canvas;
-      const originalY = dragStartPos.current.y;
+      const { originalY, snappedOut } = dragState.current;
 
-      // Rubber band: node moves freely in X, but Y is constrained
+      if (snappedOut) {
+        // Node is snapped out - move freely
+        visNodes.update({
+          id: nodeId,
+          label: visNodes.get(nodeId)?.label || "",
+          x: pointer.x,
+          y: pointer.y,
+        });
+        return;
+      }
+
+      // Calculate distance from original position
       const yOffset = pointer.y - originalY;
-      const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
+      const distance = Math.abs(yOffset);
 
-      visNodes.update({
-        id: nodeId,
-        label: visNodes.get(nodeId)?.label || "",
-        x: pointer.x,
-        y: rubberBandY,
-      });
+      if (distance > SNAP_OUT_THRESHOLD) {
+        // Snap out! Remove edges connected to this node
+        const connectedEdges = visEdges.get({
+          filter: (edge) => edge.from === nodeId || edge.to === nodeId,
+        });
+        connectedEdges.forEach((edge) => visEdges.remove(edge.id));
+
+        dragState.current.snappedOut = true;
+
+        // Move node freely
+        visNodes.update({
+          id: nodeId,
+          label: visNodes.get(nodeId)?.label || "",
+          x: pointer.x,
+          y: pointer.y,
+        });
+      } else {
+        // Rubber band effect
+        const rubberBandY = originalY + yOffset * RUBBER_BAND_FACTOR;
+
+        visNodes.update({
+          id: nodeId,
+          label: visNodes.get(nodeId)?.label || "",
+          x: pointer.x,
+          y: rubberBandY,
+        });
+      }
     });
 
-    // Snap back to original Y on drag end
+    // Snap back to original Y on drag end (unless snapped out)
     network.on("dragEnd", (params) => {
-      if (!dragStartPos.current || params.nodes.length !== 1) return;
+      if (!dragState.current || params.nodes.length !== 1) return;
 
       const nodeId = params.nodes[0] as string;
-      if (nodeId !== dragStartPos.current.nodeId) return;
+      if (nodeId !== dragState.current.nodeId) return;
 
-      const currentPos = network.getPositions([nodeId])[nodeId];
+      if (!dragState.current.snappedOut) {
+        // Snap back to original Y
+        const currentPos = network.getPositions([nodeId])[nodeId];
+        visNodes.update({
+          id: nodeId,
+          label: visNodes.get(nodeId)?.label || "",
+          x: currentPos.x,
+          y: dragState.current.originalY,
+        });
+      }
 
-      visNodes.update({
-        id: nodeId,
-        label: visNodes.get(nodeId)?.label || "",
-        x: currentPos.x,
-        y: dragStartPos.current.y,
-      });
-
-      dragStartPos.current = null;
+      dragState.current = null;
     });
 
     return () => {
       network.destroy();
     };
-  }, [nodes, edges]);
+  }, [nodes, initialEdges]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }
