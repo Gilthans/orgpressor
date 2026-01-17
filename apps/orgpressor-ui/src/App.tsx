@@ -1,6 +1,14 @@
+import { useCallback } from "react";
 import { OrgGraph } from "./components/OrgGraph";
 import nodesData from "./data/nodes.json";
-import type { PersonNode, HierarchyEdge } from "./types";
+import type { PersonNode, HierarchyEdge, GraphAccessor } from "./types";
+
+// Expose accessor for e2e testing
+declare global {
+  interface Window {
+    __GRAPH_ACCESSOR__?: GraphAccessor;
+  }
+}
 
 const nodes: PersonNode[] = nodesData;
 
@@ -15,9 +23,14 @@ const edges: HierarchyEdge[] = [
 ];
 
 function App() {
+  const handleReady = useCallback((accessor: GraphAccessor) => {
+    // Expose for e2e testing
+    window.__GRAPH_ACCESSOR__ = accessor;
+  }, []);
+
   return (
     <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
-      <OrgGraph nodes={nodes} edges={edges} />
+      <OrgGraph nodes={nodes} edges={edges} onReady={handleReady} />
     </div>
   );
 }

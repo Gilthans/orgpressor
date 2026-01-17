@@ -24,6 +24,12 @@ export function useViewConstraints({ network, onScaleChange }: UseViewConstraint
     // Report initial scale
     onScaleChange?.(network.getScale());
 
+    // Listen for scale changes from any source (including useLayout)
+    const handleZoom = () => {
+      onScaleChange?.(network.getScale());
+    };
+    network.on("zoom", handleZoom);
+
     // Calculate the top Y position in canvas coordinates
     const getTopY = (viewY: number, scale: number) => {
       return viewY - containerHeight / 2 / scale;
@@ -119,6 +125,7 @@ export function useViewConstraints({ network, onScaleChange }: UseViewConstraint
       window.removeEventListener("mouseup", handleMouseUp);
       container.removeEventListener("mouseleave", handleMouseLeave);
       container.removeEventListener("wheel", handleWheel);
+      network.off("zoom", handleZoom);
     };
   }, [network, onScaleChange]);
 }
