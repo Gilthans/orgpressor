@@ -3,6 +3,11 @@ import type { Options } from "vis-network";
 export const RUBBER_BAND_FACTOR = 0.15;
 export const SNAP_OUT_THRESHOLD = 150;
 
+// Layout settings for free nodes
+export const FREE_NODES_TOP_MARGIN = 150;
+export const FREE_NODES_SPACING = 120;
+export const FREE_NODES_PER_ROW = 5;
+
 export const networkOptions: Options = {
   layout: {
     hierarchical: {
@@ -38,7 +43,7 @@ export const networkOptions: Options = {
   },
   interaction: {
     dragNodes: true,
-    dragView: true,
-    zoomView: true,
+    dragView: false, // Disabled - custom X-only panning in useViewConstraints
+    zoomView: false, // Disabled - custom zoom that keeps top fixed in useViewConstraints
   },
 };

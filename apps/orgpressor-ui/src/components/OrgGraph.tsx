@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { PersonNode, HierarchyEdge } from "../types";
 import { networkOptions } from "../config";
-import { useVisNetwork, useNodeDrag } from "../hooks";
+import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
 
 interface OrgGraphProps {
   nodes: PersonNode[];
@@ -18,11 +18,19 @@ export function OrgGraph({ nodes, edges }: OrgGraphProps) {
     options: networkOptions,
   });
 
+  useLayout({
+    network,
+    nodesDataSet,
+    edgesDataSet,
+  });
+
   useNodeDrag({
     network,
     nodesDataSet,
     edgesDataSet,
   });
+
+  useViewConstraints({ network });
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }
