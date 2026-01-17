@@ -20,12 +20,22 @@ export default defineConfig({
       fileName: (format) => `index.${format === "es" ? "mjs" : "cjs"}`,
     },
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime"],
+      external: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "vis-data",
+        "vis-network",
+        "vis-network/standalone",
+      ],
       output: {
         globals: {
           react: "React",
           "react-dom": "ReactDOM",
           "react/jsx-runtime": "jsxRuntime",
+          "vis-data": "vis",
+          "vis-network": "vis",
+          "vis-network/standalone": "vis",
         },
       },
     },
