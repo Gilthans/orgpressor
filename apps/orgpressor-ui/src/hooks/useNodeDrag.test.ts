@@ -451,4 +451,131 @@ describe("useNodeDrag", () => {
       expect(mockNodesDataSet.update).not.toHaveBeenCalled();
     });
   });
+
+  describe("onHierarchyChange callback", () => {
+    it("calls onHierarchyChange when node disconnects from parent", () => {
+      const onHierarchyChange = vi.fn();
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          onHierarchyChange,
+        })
+      );
+
+      const startX = 200;
+      const startY = 300; // Node 2's Y position
+      const dragY = startY + SNAP_OUT_THRESHOLD + 50; // Past threshold
+
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: startX, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: dragY } },
+      });
+
+      expect(onHierarchyChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onHierarchyChange when node stays within threshold", () => {
+      const onHierarchyChange = vi.fn();
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          onHierarchyChange,
+        })
+      );
+
+      const startX = 200;
+      const startY = 300;
+      const dragY = startY + 30; // Within threshold
+
+      const positions: Record<string, { x: number; y: number }> = {
+        ...allPositions,
+        "2": { x: startX, y: startY },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["2"] });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: startY } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["2"],
+        pointer: { canvas: { x: startX, y: dragY } },
+      });
+      eventHandlers["dragEnd"]({ nodes: ["2"] });
+
+      expect(onHierarchyChange).not.toHaveBeenCalled();
+    });
+
+    it("does not call onHierarchyChange when free node is dragged", () => {
+      const onHierarchyChange = vi.fn();
+      allEdges = [];
+      mockEdgesDataSet.get = vi.fn().mockImplementation(() => []);
+
+      renderHook(() =>
+        useNodeDrag({
+          network: mockNetwork,
+          nodesDataSet: mockNodesDataSet,
+          edgesDataSet: mockEdgesDataSet,
+          onHierarchyChange,
+        })
+      );
+
+      const positions: Record<string, { x: number; y: number }> = {
+        "1": { x: 100, y: 200 },
+      };
+      mockNetwork.getPositions = vi.fn().mockImplementation((ids?: string[]) => {
+        if (!ids) return positions;
+        const result: Record<string, { x: number; y: number }> = {};
+        ids.forEach((id) => {
+          if (positions[id]) result[id] = positions[id];
+        });
+        return result;
+      });
+
+      eventHandlers["dragStart"]({ nodes: ["1"] });
+      eventHandlers["dragging"]({
+        nodes: ["1"],
+        pointer: { canvas: { x: 100, y: 200 } },
+      });
+      eventHandlers["dragging"]({
+        nodes: ["1"],
+        pointer: { canvas: { x: 300, y: 400 } },
+      });
+      eventHandlers["dragEnd"]({ nodes: ["1"] });
+
+      expect(onHierarchyChange).not.toHaveBeenCalled();
+    });
+  });
 });
