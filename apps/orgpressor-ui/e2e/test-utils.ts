@@ -5,6 +5,7 @@ import { Page, Locator } from "@playwright/test";
 // =============================================================================
 
 export const TOP_BAR_HEIGHT = 60;
+export const TOP_BAR_CENTER_Y = TOP_BAR_HEIGHT / 2;
 export const SNAP_OUT_THRESHOLD = 150;
 
 // =============================================================================
@@ -94,8 +95,27 @@ export async function setupPage(page: Page): Promise<void> {
 
 export async function waitForNetwork(page: Page): Promise<void> {
   await page.waitForSelector("canvas");
-  // Wait for layout animation to complete
-  await page.waitForTimeout(1000);
+  // Wait for initial layout to stabilize by polling until canvas stops changing
+  await waitForCanvasStable(page, 1000);
+}
+
+/**
+ * Poll until canvas stops changing (stable layout).
+ * Used internally - prefer waitForStableLayout in tests.
+ */
+async function waitForCanvasStable(page: Page, timeoutMs: number): Promise<void> {
+  const POLL_INTERVAL = 50;
+  const canvas = getCanvas(page);
+  let prev = await canvas.screenshot();
+  let stable = false;
+  const startTime = Date.now();
+
+  while (!stable && Date.now() - startTime < timeoutMs) {
+    await page.waitForTimeout(POLL_INTERVAL);
+    const current = await canvas.screenshot();
+    stable = Buffer.compare(prev, current) === 0;
+    prev = current;
+  }
 }
 
 // =============================================================================
@@ -120,7 +140,7 @@ export interface DragOptions {
 const DEFAULT_DRAG_OPTIONS: Required<DragOptions> = {
   steps: 20,
   stepDelay: 10,
-  settleDelay: 100,
+  settleDelay: 0, // Callers should use waitForStableLayout for proper settling
 };
 
 export async function drag(
@@ -144,7 +164,9 @@ export async function drag(
   }
 
   await page.mouse.up();
-  await page.waitForTimeout(settleDelay);
+  if (settleDelay > 0) {
+    await page.waitForTimeout(settleDelay);
+  }
 }
 
 export async function dragNode(
@@ -210,4 +232,139 @@ export async function snapOutNode(
 
   await drag(page, pos.x, pos.y, endX, endY, options);
   return { endX, endY };
+}
+
+// =============================================================================
+// Layout stability helpers
+// =============================================================================
+
+/**
+ * Wait for canvas layout to stabilize by polling until consecutive snapshots match.
+ * Uses 50ms polling interval for fast detection while avoiding excessive CPU usage.
+ */
+export async function waitForStableLayout(page: Page, timeoutMs = 500): Promise<void> {
+  const POLL_INTERVAL = 50;
+  let prev = await getCanvasSnapshot(page);
+  let stable = false;
+  const startTime = Date.now();
+
+  while (!stable && Date.now() - startTime < timeoutMs) {
+    await page.waitForTimeout(POLL_INTERVAL);
+    const current = await getCanvasSnapshot(page);
+    stable = Buffer.compare(prev, current) === 0;
+    prev = current;
+  }
+}
+
+// =============================================================================
+// High-level action helpers
+// =============================================================================
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
+/**
+ * Make a node a root by dragging it to the top bar.
+ * Returns the position where the root was placed.
+ */
+export async function makeRoot(
+  page: Page,
+  nodeName: NodeName,
+  targetX: number,
+  options?: DragOptions
+): Promise<Position> {
+  await dragNodeToTopBar(page, nodeName, targetX, options);
+  await waitForStableLayout(page);
+  return { x: targetX, y: TOP_BAR_CENTER_Y };
+}
+
+/**
+ * Snap out a node and connect it to another node.
+ * Returns the final position after connection.
+ */
+export async function snapOutAndConnectTo(
+  page: Page,
+  nodeName: NodeName,
+  targetNode: NodeName,
+  snapDirection: "down" | "up" | "left" | "right" = "down",
+  options?: DragOptions
+): Promise<void> {
+  const { endX, endY } = await snapOutNode(page, nodeName, snapDirection, 100, options);
+  await waitForStableLayout(page);
+
+  const targetPos = NODE_POSITIONS[targetNode];
+  await drag(page, endX, endY, targetPos.x, targetPos.y, options);
+  await waitForStableLayout(page);
+}
+
+/**
+ * Snap out a node and connect it to a specific position.
+ */
+export async function snapOutAndConnectToPosition(
+  page: Page,
+  nodeName: NodeName,
+  targetX: number,
+  targetY: number,
+  snapDirection: "down" | "up" | "left" | "right" = "down",
+  options?: DragOptions
+): Promise<void> {
+  const { endX, endY } = await snapOutNode(page, nodeName, snapDirection, 100, options);
+  await waitForStableLayout(page);
+
+  await drag(page, endX, endY, targetX, targetY, options);
+  await waitForStableLayout(page);
+}
+
+/**
+ * Connect a free node to a root position in the top bar.
+ */
+export async function connectToRootPosition(
+  page: Page,
+  nodeName: NodeName,
+  rootX: number,
+  options?: DragOptions
+): Promise<void> {
+  const pos = NODE_POSITIONS[nodeName];
+  await drag(page, pos.x, pos.y, rootX, TOP_BAR_CENTER_Y, options);
+  await waitForStableLayout(page);
+}
+
+// =============================================================================
+// Assertion helpers
+// =============================================================================
+
+/**
+ * Execute an action and assert that the layout changed.
+ * Takes a before snapshot, runs the action, waits for stable layout, and compares.
+ */
+export async function expectLayoutChanged(
+  page: Page,
+  action: () => Promise<void>
+): Promise<{ before: Buffer; after: Buffer }> {
+  const before = await getCanvasSnapshot(page);
+  await action();
+  await waitForStableLayout(page);
+  const after = await getCanvasSnapshot(page);
+
+  if (Buffer.compare(before, after) === 0) {
+    throw new Error("Expected layout to change, but it remained the same");
+  }
+
+  return { before, after };
+}
+
+/**
+ * Execute an action and return before/after snapshots without asserting change.
+ */
+export async function captureLayoutChange(
+  page: Page,
+  action: () => Promise<void>
+): Promise<{ before: Buffer; after: Buffer }> {
+  const before = await getCanvasSnapshot(page);
+  await action();
+  await waitForStableLayout(page);
+  const after = await getCanvasSnapshot(page);
+  return { before, after };
 }
