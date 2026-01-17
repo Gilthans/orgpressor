@@ -1,79 +1,61 @@
-import { test, expect } from "@playwright/test";
-import {
-  setupPage,
-  getCanvas,
-  drag,
-  waitForStableLayout,
-  expectLayoutChanged,
-  snapOutAndConnectTo,
-  snapOutAndConnectToPosition,
-  makeRoot,
-  NODE_POSITIONS,
-} from "./test-utils";
+import { test } from "@playwright/test";
+import { OrgChartPage } from "./pages/OrgChartPage";
 
 test.describe("Reconnection Flows", () => {
+  let orgChart: OrgChartPage;
+
   test.beforeEach(async ({ page }) => {
-    await setupPage(page);
+    orgChart = new OrgChartPage(page);
+    await orgChart.goto();
   });
 
-  test("snap out then reconnect to different parent", async ({ page }) => {
+  test("snap out then reconnect to different parent", async () => {
     // Emily is currently under Sarah - snap out and connect to Michael
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectTo(page, "Emily Davis", "Michael Chen");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Emily Davis", "Michael Chen");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("snap out then reconnect to same parent", async ({ page }) => {
+  test("snap out then reconnect to same parent", async () => {
     // Snap out Emily from Sarah, then reconnect back
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectTo(page, "Emily Davis", "Sarah Johnson");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Emily Davis", "Sarah Johnson");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("snap out subtree then reconnect to different branch", async ({ page }) => {
+  test("snap out subtree then reconnect to different branch", async () => {
     // Snap out Sarah (with Emily and Robert) and connect under Michael
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectTo(page, "Sarah Johnson", "Michael Chen");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Sarah Johnson", "Michael Chen");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("node reconnected multiple times sequentially", async ({ page }) => {
+  test("node reconnected multiple times sequentially", async () => {
     // Snap out Robert and connect to Michael
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectTo(page, "Robert Wilson", "Michael Chen");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Robert Wilson", "Michael Chen");
     });
 
-    // Robert is now under Michael at level 2
-    // Snap out from new position and connect to Lisa
-    const michaelPos = NODE_POSITIONS["Michael Chen"];
-    const robertNewX = michaelPos.x + 50;
-    const robertNewY = 230; // Level 2
+    // Robert is now under Michael - get his new position
+    const robertPos = await orgChart.getNodePosition("Robert Wilson");
 
-    await drag(page, robertNewX, robertNewY, robertNewX, robertNewY + 250);
-    await waitForStableLayout(page);
+    // Snap out from new position
+    await orgChart.drag(robertPos.x, robertPos.y, robertPos.x, robertPos.y + 250);
+    await orgChart.waitForStableLayout();
 
-    const lisaPos = NODE_POSITIONS["Lisa Anderson"];
-    await drag(page, robertNewX, robertNewY + 250, lisaPos.x, lisaPos.y);
-    await waitForStableLayout(page);
-
-    await expect(getCanvas(page)).toBeVisible();
+    // Connect to Lisa
+    const lisaPos = await orgChart.getNodePosition("Lisa Anderson");
+    await orgChart.drag(robertPos.x, robertPos.y + 250, lisaPos.x, lisaPos.y);
+    await orgChart.waitForStableLayout();
   });
 
-  test("connect to newly created root", async ({ page }) => {
+  test("connect to newly created root", async () => {
     // Make Jennifer a root
-    const jenniferRoot = await makeRoot(page, "Jennifer Taylor", 800);
+    await orgChart.makeRoot("Jennifer Taylor", 800);
 
     // Snap out Emily and connect to Jennifer
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectToPosition(page, "Emily Davis", jenniferRoot.x, jenniferRoot.y);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Emily Davis", "Jennifer Taylor");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 });

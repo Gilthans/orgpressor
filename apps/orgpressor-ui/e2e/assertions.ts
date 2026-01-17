@@ -16,15 +16,6 @@ export async function expectToBeRoot(page: OrgChartPage, nodeLabel: string): Pro
 }
 
 /**
- * Assert that a node is NOT a root node.
- */
-export async function expectNotToBeRoot(page: OrgChartPage, nodeLabel: string): Promise<void> {
-  const node = await page.getNode(nodeLabel);
-  expect(node, `Node "${nodeLabel}" not found`).not.toBeNull();
-  expect(node!.isRoot, `Expected "${nodeLabel}" to NOT be a root node`).toBe(false);
-}
-
-/**
  * Assert that two nodes are connected (parent -> child).
  */
 export async function expectToBeConnected(
@@ -93,42 +84,6 @@ export async function expectToBeInTopBar(page: OrgChartPage, nodeLabel: string):
     node!.position.y,
     `Expected "${nodeLabel}" to be in top bar (y < ${TOP_BAR_HEIGHT}), got y=${node!.position.y}`
   ).toBeLessThan(TOP_BAR_HEIGHT);
-}
-
-/**
- * Assert that a node is positioned below the top bar.
- */
-export async function expectToBeBelowTopBar(page: OrgChartPage, nodeLabel: string): Promise<void> {
-  const node = await page.getNode(nodeLabel);
-  expect(node, `Node "${nodeLabel}" not found`).not.toBeNull();
-  expect(
-    node!.position.y,
-    `Expected "${nodeLabel}" to be below top bar (y >= ${TOP_BAR_HEIGHT}), got y=${node!.position.y}`
-  ).toBeGreaterThanOrEqual(TOP_BAR_HEIGHT);
-}
-
-/**
- * Assert that a node is at approximately the expected position.
- */
-export async function expectNodePosition(
-  page: OrgChartPage,
-  nodeLabel: string,
-  expectedX: number,
-  expectedY: number,
-  tolerance: number = 20
-): Promise<void> {
-  const node = await page.getNode(nodeLabel);
-  expect(node, `Node "${nodeLabel}" not found`).not.toBeNull();
-
-  const pos = node!.position;
-  expect(
-    Math.abs(pos.x - expectedX),
-    `Expected "${nodeLabel}" x≈${expectedX}, got ${pos.x}`
-  ).toBeLessThanOrEqual(tolerance);
-  expect(
-    Math.abs(pos.y - expectedY),
-    `Expected "${nodeLabel}" y≈${expectedY}, got ${pos.y}`
-  ).toBeLessThanOrEqual(tolerance);
 }
 
 /**

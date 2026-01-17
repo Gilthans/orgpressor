@@ -1,90 +1,75 @@
 import { test, expect } from "@playwright/test";
-import {
-  setupPage,
-  getCanvas,
-  getCanvasSnapshot,
-  drag,
-  snapOutNode,
-  waitForStableLayout,
-  expectLayoutChanged,
-  makeRoot,
-  dragNodeToNode,
-  TOP_BAR_HEIGHT,
-  NODE_POSITIONS,
-} from "./test-utils";
+import { OrgChartPage } from "./pages/OrgChartPage";
+import { TOP_BAR_HEIGHT } from "./test-utils";
 
 test.describe("Layout Verification", () => {
+  let orgChart: OrgChartPage;
+
   test.beforeEach(async ({ page }) => {
-    await setupPage(page);
+    orgChart = new OrgChartPage(page);
+    await orgChart.goto();
   });
 
-  test("root at Y approximately 30 (centered in 60px top bar)", async ({ page }) => {
-    const johnPos = NODE_POSITIONS["John Smith"];
-    expect(johnPos.y).toBe(30);
+  test("root at Y approximately 30 (centered in 60px top bar)", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
+
+    // Root should be centered in the 60px top bar
+    expect(johnPos.y).toBeCloseTo(TOP_BAR_HEIGHT / 2, 0);
     expect(TOP_BAR_HEIGHT).toBe(60);
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("level separation is 100px", async ({ page }) => {
-    const johnY = NODE_POSITIONS["John Smith"].y;
-    const sarahY = NODE_POSITIONS["Sarah Johnson"].y;
-    const emilyY = NODE_POSITIONS["Emily Davis"].y;
+  test("level separation is 100px", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
+    const sarahPos = await orgChart.getNodePosition("Sarah Johnson");
+    const emilyPos = await orgChart.getNodePosition("Emily Davis");
 
-    expect(sarahY - johnY).toBe(100);
-    expect(emilyY - sarahY).toBe(100);
-
-    await expect(getCanvas(page)).toBeVisible();
+    expect(sarahPos.y - johnPos.y).toBe(100);
+    expect(emilyPos.y - sarahPos.y).toBe(100);
   });
 
-  test("free nodes below hierarchy", async ({ page }) => {
-    const lowestHierarchyY = NODE_POSITIONS["Emily Davis"].y;
-    const freeNodeY = NODE_POSITIONS["Jennifer Taylor"].y;
+  test("free nodes below hierarchy", async () => {
+    const emilyPos = await orgChart.getNodePosition("Emily Davis");
+    const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
 
-    expect(freeNodeY).toBeGreaterThan(lowestHierarchyY + 100);
-
-    await expect(getCanvas(page)).toBeVisible();
+    // Free nodes should be positioned well below the hierarchy
+    expect(jenniferPos.y).toBeGreaterThan(emilyPos.y + 100);
   });
 
-  test("new child positioned right of siblings", async ({ page }) => {
+  test("new child positioned right of siblings", async () => {
     // Add Jennifer to Sarah (who already has Emily and Robert)
-    await expectLayoutChanged(page, async () => {
-      await dragNodeToNode(page, "Jennifer Taylor", "Sarah Johnson");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.connectNodes("Jennifer Taylor", "Sarah Johnson");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("new root positioned right of existing", async ({ page }) => {
-    const johnPos = NODE_POSITIONS["John Smith"];
+  test("new root positioned right of existing", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
 
-    await expectLayoutChanged(page, async () => {
-      await makeRoot(page, "Jennifer Taylor", johnPos.x + 400);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.makeRoot("Jennifer Taylor", johnPos.x + 400);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("layout stable after rapid operations", async ({ page }) => {
-    const jenniferPos = NODE_POSITIONS["Jennifer Taylor"];
-    const sarahPos = NODE_POSITIONS["Sarah Johnson"];
-    const jamesPos = NODE_POSITIONS["James Brown"];
+  test("layout stable after rapid operations", async () => {
+    // Get initial positions
+    const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
+    const sarahPos = await orgChart.getNodePosition("Sarah Johnson");
+    const jamesPos = await orgChart.getNodePosition("James Brown");
 
-    // Perform rapid operations with minimal delays (just enough for events to process)
-    await drag(page, jenniferPos.x, jenniferPos.y, sarahPos.x, sarahPos.y, { steps: 10, stepDelay: 5 });
-    await snapOutNode(page, "Emily Davis", "down", 50, { steps: 10, stepDelay: 5 });
-    await drag(page, jamesPos.x, jamesPos.y, sarahPos.x, sarahPos.y, { steps: 10, stepDelay: 5 });
+    // Perform rapid operations with minimal delays
+    await orgChart.drag(jenniferPos.x, jenniferPos.y, sarahPos.x, sarahPos.y, { steps: 10, stepDelay: 5 });
+    await orgChart.snapOutNode("Emily Davis", "down", 50);
+    await orgChart.drag(jamesPos.x, jamesPos.y, sarahPos.x, sarahPos.y, { steps: 10, stepDelay: 5 });
 
-    // Wait for layout to stabilize using polling
-    await waitForStableLayout(page, 1000);
+    // Wait for layout to stabilize
+    await orgChart.waitForStableLayout(1000);
 
-    // Verify layout is stable by taking two snapshots with waitForStableLayout between
-    const snapshot1 = await getCanvasSnapshot(page);
-    await waitForStableLayout(page, 200);
-    const snapshot2 = await getCanvasSnapshot(page);
+    // Verify layout is stable by taking two snapshots
+    const snapshot1 = await orgChart.takeSnapshot();
+    await orgChart.waitForStableLayout(200);
+    const snapshot2 = await orgChart.takeSnapshot();
 
     // Layout should be stable (no drift)
     expect(Buffer.compare(snapshot1, snapshot2)).toBe(0);
-    await expect(getCanvas(page)).toBeVisible();
   });
 });

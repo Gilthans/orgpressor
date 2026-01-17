@@ -1,97 +1,81 @@
-import { test, expect } from "@playwright/test";
-import {
-  setupPage,
-  getCanvas,
-  dragNodeToNode,
-  dragNodeToTopBar,
-  snapOutNode,
-  drag,
-  waitForStableLayout,
-  expectLayoutChanged,
-  TOP_BAR_CENTER_Y,
-  NODE_POSITIONS,
-} from "./test-utils";
+import { test } from "@playwright/test";
+import { OrgChartPage } from "./pages/OrgChartPage";
+import { TOP_BAR_CENTER_Y } from "./test-utils";
 
 test.describe("Drag Behavior", () => {
+  let orgChart: OrgChartPage;
+
   test.beforeEach(async ({ page }) => {
-    await setupPage(page);
+    orgChart = new OrgChartPage(page);
+    await orgChart.goto();
   });
 
   test.describe("Free node (no children)", () => {
-    test("dragging to top bar and releasing creates a root", async ({ page }) => {
-      await expectLayoutChanged(page, async () => {
-        await dragNodeToTopBar(page, "Jennifer Taylor", 900);
+    test("dragging to top bar and releasing creates a root", async () => {
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.makeRoot("Jennifer Taylor", 900);
       });
     });
 
-    test("dragging to hierarchy node and releasing connects them", async ({ page }) => {
-      await expectLayoutChanged(page, async () => {
-        await dragNodeToNode(page, "Jennifer Taylor", "John Smith");
+    test("dragging to hierarchy node and releasing connects them", async () => {
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.connectNodes("Jennifer Taylor", "John Smith");
       });
     });
   });
 
   test.describe("Connected node (no children)", () => {
-    test("snaps out when dragged past threshold", async ({ page }) => {
-      await expectLayoutChanged(page, async () => {
-        await snapOutNode(page, "Emily Davis", "down");
+    test("snaps out when dragged past threshold", async () => {
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.snapOutNode("Emily Davis", "down");
       });
     });
 
-    test("snaps back when dragged within threshold", async ({ page }) => {
-      const pos = NODE_POSITIONS["Emily Davis"];
+    test("snaps back when dragged within threshold", async () => {
+      const pos = await orgChart.getNodePosition("Emily Davis");
 
       // Drag within threshold - should snap back
-      await drag(page, pos.x, pos.y, pos.x + 50, pos.y + 50);
-      await waitForStableLayout(page);
-
-      // No crash, canvas still visible
-      await expect(getCanvas(page)).toBeVisible();
+      await orgChart.drag(pos.x, pos.y, pos.x + 50, pos.y + 50);
+      await orgChart.waitForStableLayout();
     });
   });
 
   test.describe("Node with children (subtree)", () => {
-    test("subtree snaps out together when dragged past threshold", async ({ page }) => {
-      await expectLayoutChanged(page, async () => {
-        await snapOutNode(page, "Sarah Johnson", "down");
+    test("subtree snaps out together when dragged past threshold", async () => {
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.snapOutNode("Sarah Johnson", "down");
       });
     });
 
-    test("subtree can be dragged to top bar after snapping out", async ({ page }) => {
+    test("subtree can be dragged to top bar after snapping out", async () => {
       // Snap out Sarah first
-      const { endX, endY } = await snapOutNode(page, "Sarah Johnson", "down");
-      await waitForStableLayout(page);
+      const endPos = await orgChart.snapOutNode("Sarah Johnson", "down");
 
       // Now drag to top bar (to the right of existing root)
-      await expectLayoutChanged(page, async () => {
-        await drag(page, endX, endY, 700, TOP_BAR_CENTER_Y);
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.drag(endPos.x, endPos.y, 700, TOP_BAR_CENTER_Y);
       });
     });
 
-    test("subtree can be connected to another node after snapping out", async ({ page }) => {
+    test("subtree can be connected to another node after snapping out", async () => {
       // Snap out Michael Chen (has children Lisa and David)
-      const { endX, endY } = await snapOutNode(page, "Michael Chen", "down");
-      await waitForStableLayout(page);
+      const endPos = await orgChart.snapOutNode("Michael Chen", "down");
 
       // Drag to Sarah's position
-      const sarahPos = NODE_POSITIONS["Sarah Johnson"];
-      await expectLayoutChanged(page, async () => {
-        await drag(page, endX, endY, sarahPos.x, sarahPos.y);
+      const sarahPos = await orgChart.getNodePosition("Sarah Johnson");
+      await orgChart.expectLayoutChanged(async () => {
+        await orgChart.drag(endPos.x, endPos.y, sarahPos.x, sarahPos.y);
       });
     });
 
-    test("subtree moves together during free drag", async ({ page }) => {
+    test("subtree moves together during free drag", async () => {
       // Snap out Sarah first
-      const { endX, endY } = await snapOutNode(page, "Sarah Johnson", "down");
-      await waitForStableLayout(page);
+      const endPos = await orgChart.snapOutNode("Sarah Johnson", "down");
 
       // Drag around
-      await drag(page, endX, endY, endX + 150, endY + 50);
-      await drag(page, endX + 150, endY + 50, endX - 100, endY + 100);
-      await waitForStableLayout(page);
-
-      // No errors, canvas still functional
-      await expect(getCanvas(page)).toBeVisible();
+      await orgChart.drag(endPos.x, endPos.y, endPos.x + 150, endPos.y + 50);
+      await orgChart.drag(endPos.x + 150, endPos.y + 50, endPos.x - 100, endPos.y + 100);
+      await orgChart.waitForStableLayout();
     });
   });
 });

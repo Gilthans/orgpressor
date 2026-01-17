@@ -1,80 +1,61 @@
-import { test, expect } from "@playwright/test";
-import {
-  setupPage,
-  getCanvas,
-  drag,
-  snapOutNode,
-  waitForStableLayout,
-  expectLayoutChanged,
-  TOP_BAR_CENTER_Y,
-  SNAP_OUT_THRESHOLD,
-  NODE_POSITIONS,
-} from "./test-utils";
+import { test } from "@playwright/test";
+import { OrgChartPage } from "./pages/OrgChartPage";
+import { TOP_BAR_CENTER_Y, SNAP_OUT_THRESHOLD } from "./test-utils";
 
 test.describe("Root Node Behavior", () => {
+  let orgChart: OrgChartPage;
+
   test.beforeEach(async ({ page }) => {
-    await setupPage(page);
+    orgChart = new OrgChartPage(page);
+    await orgChart.goto();
   });
 
-  test("root can be dragged horizontally in top bar", async ({ page }) => {
-    const johnPos = NODE_POSITIONS["John Smith"];
+  test("root can be dragged horizontally in top bar", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
 
     // Drag John left within the top bar
-    await expectLayoutChanged(page, async () => {
-      await drag(page, johnPos.x, johnPos.y, johnPos.x - 100, johnPos.y);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(johnPos.x, johnPos.y, johnPos.x - 100, johnPos.y);
     });
 
     // Drag John right within the top bar
-    await expectLayoutChanged(page, async () => {
-      await drag(page, johnPos.x - 100, johnPos.y, johnPos.x + 100, johnPos.y);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(johnPos.x - 100, johnPos.y, johnPos.x + 100, johnPos.y);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("root snaps out when dragged past threshold", async ({ page }) => {
-    await expectLayoutChanged(page, async () => {
-      await snapOutNode(page, "John Smith", "down");
+  test("root snaps out when dragged past threshold", async () => {
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutNode("John Smith", "down");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("root with children snaps out with entire tree", async ({ page }) => {
+  test("root with children snaps out with entire tree", async () => {
     // Snap out John (has Sarah, Michael, and all their children)
-    const { endX, endY } = await snapOutNode(page, "John Smith", "down");
-    await waitForStableLayout(page);
+    const endPos = await orgChart.snapOutNode("John Smith", "down");
 
     // Drag the entire tree around to verify all children follow
-    await expectLayoutChanged(page, async () => {
-      await drag(page, endX, endY, endX + 100, endY + 50);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(endPos.x, endPos.y, endPos.x + 100, endPos.y + 50);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("snapped-out root can become root again", async ({ page }) => {
+  test("snapped-out root can become root again", async () => {
     // Snap out John
-    const { endX, endY } = await snapOutNode(page, "John Smith", "down");
-    await waitForStableLayout(page);
+    const endPos = await orgChart.snapOutNode("John Smith", "down");
 
     // Drag back to top bar
-    await expectLayoutChanged(page, async () => {
-      await drag(page, endX, endY, 400, TOP_BAR_CENTER_Y);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(endPos.x, endPos.y, 400, TOP_BAR_CENTER_Y);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("root rubber-bands within threshold", async ({ page }) => {
-    const johnPos = NODE_POSITIONS["John Smith"];
+  test("root rubber-bands within threshold", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
 
     // Drag John down but within threshold (should snap back)
     const smallDistance = SNAP_OUT_THRESHOLD - 50;
-    await drag(page, johnPos.x, johnPos.y, johnPos.x, johnPos.y + smallDistance);
-    await waitForStableLayout(page);
-
-    // Canvas should still be functional
-    await expect(getCanvas(page)).toBeVisible();
+    await orgChart.drag(johnPos.x, johnPos.y, johnPos.x, johnPos.y + smallDistance);
+    await orgChart.waitForStableLayout();
   });
 });

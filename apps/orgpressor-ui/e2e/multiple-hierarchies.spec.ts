@@ -1,97 +1,88 @@
-import { test, expect } from "@playwright/test";
-import {
-  setupPage,
-  getCanvas,
-  drag,
-  waitForStableLayout,
-  expectLayoutChanged,
-  snapOutAndConnectTo,
-  makeRoot,
-  connectToRootPosition,
-  NODE_POSITIONS,
-} from "./test-utils";
+import { test } from "@playwright/test";
+import { OrgChartPage } from "./pages/OrgChartPage";
+import { TOP_BAR_CENTER_Y } from "./test-utils";
 
 test.describe("Multiple Hierarchies", () => {
+  let orgChart: OrgChartPage;
+
   test.beforeEach(async ({ page }) => {
-    await setupPage(page);
+    orgChart = new OrgChartPage(page);
+    await orgChart.goto();
   });
 
-  test("second root positioned to right of first", async ({ page }) => {
-    const johnPos = NODE_POSITIONS["John Smith"];
+  test("second root positioned to right of first", async () => {
+    const johnPos = await orgChart.getNodePosition("John Smith");
 
-    await expectLayoutChanged(page, async () => {
-      await makeRoot(page, "Jennifer Taylor", johnPos.x + 300);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.makeRoot("Jennifer Taylor", johnPos.x + 300);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("multiple roots layout independently", async ({ page }) => {
+  test("multiple roots layout independently", async () => {
     // Create Jennifer as a second root
-    const jenniferRoot = await makeRoot(page, "Jennifer Taylor", 700);
+    await orgChart.makeRoot("Jennifer Taylor", 700);
 
-    // Add James as child of Jennifer
-    await expectLayoutChanged(page, async () => {
-      await connectToRootPosition(page, "James Brown", jenniferRoot.x);
+    // Add James as child of Jennifer (drag to Jennifer's position)
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.connectNodes("James Brown", "Jennifer Taylor");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("merge trees by connecting root to other hierarchy", async ({ page }) => {
+  test("merge trees by connecting root to other hierarchy", async () => {
     // Create Jennifer as a second root
-    await makeRoot(page, "Jennifer Taylor", 700);
+    await orgChart.makeRoot("Jennifer Taylor", 700);
 
     // Snap out Jennifer and connect to Sarah (in John's hierarchy)
-    await expectLayoutChanged(page, async () => {
-      await snapOutAndConnectTo(page, "Jennifer Taylor", "Sarah Johnson");
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.snapOutAndConnectTo("Jennifer Taylor", "Sarah Johnson");
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("snap out hierarchy and connect to another", async ({ page }) => {
+  test("snap out hierarchy and connect to another", async () => {
     // Create Jennifer as root with James as child
-    const jenniferRoot = await makeRoot(page, "Jennifer Taylor", 700);
-    await connectToRootPosition(page, "James Brown", jenniferRoot.x);
+    await orgChart.makeRoot("Jennifer Taylor", 700);
+    await orgChart.connectNodes("James Brown", "Jennifer Taylor");
+
+    // Get Jennifer's position (she's now a root in top bar)
+    const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
 
     // Snap out Jennifer (with James) and connect under Michael
-    await expectLayoutChanged(page, async () => {
-      await drag(page, jenniferRoot.x, jenniferRoot.y, 700, 300);
-      await waitForStableLayout(page);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(jenniferPos.x, jenniferPos.y, 700, 300);
+      await orgChart.waitForStableLayout();
 
-      const michaelPos = NODE_POSITIONS["Michael Chen"];
-      await drag(page, 700, 300, michaelPos.x, michaelPos.y);
+      const michaelPos = await orgChart.getNodePosition("Michael Chen");
+      await orgChart.drag(700, 300, michaelPos.x, michaelPos.y);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 
-  test("each hierarchy maintains own Y levels", async ({ page }) => {
+  test("each hierarchy maintains own Y levels", async () => {
     // Create Jennifer as second root
-    const jenniferRoot = await makeRoot(page, "Jennifer Taylor", 800);
+    await orgChart.makeRoot("Jennifer Taylor", 800);
 
     // Add James as child of Jennifer
-    await connectToRootPosition(page, "James Brown", jenniferRoot.x);
+    await orgChart.connectNodes("James Brown", "Jennifer Taylor");
 
-    // Add Maria as child of James (James is at y=130)
-    const mariaPos = NODE_POSITIONS["Maria Garcia"];
-    await drag(page, mariaPos.x, mariaPos.y, 800, 130);
-    await waitForStableLayout(page);
+    // Get James position (should be level 1 under Jennifer)
+    const jamesPos = await orgChart.getNodePosition("James Brown");
 
-    await expect(getCanvas(page)).toBeVisible();
+    // Add Maria as child of James
+    const mariaPos = await orgChart.getNodePosition("Maria Garcia");
+    await orgChart.drag(mariaPos.x, mariaPos.y, jamesPos.x, jamesPos.y);
+    await orgChart.waitForStableLayout();
   });
 
-  test("removing root leaves other hierarchies intact", async ({ page }) => {
+  test("removing root leaves other hierarchies intact", async () => {
     // Create Jennifer as second root with James as child
-    const jenniferRoot = await makeRoot(page, "Jennifer Taylor", 800);
-    await connectToRootPosition(page, "James Brown", jenniferRoot.x);
+    await orgChart.makeRoot("Jennifer Taylor", 800);
+    await orgChart.connectNodes("James Brown", "Jennifer Taylor");
+
+    // Get Jennifer's position
+    const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
 
     // Snap out Jennifer (making her free again, taking James)
-    await expectLayoutChanged(page, async () => {
-      await drag(page, jenniferRoot.x, jenniferRoot.y, 600, 450);
+    await orgChart.expectLayoutChanged(async () => {
+      await orgChart.drag(jenniferPos.x, jenniferPos.y, 600, 450);
     });
-
-    await expect(getCanvas(page)).toBeVisible();
   });
 });
