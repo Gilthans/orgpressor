@@ -7,6 +7,8 @@ interface TopBarProps {
 export function TopBar({ isHighlighted }: TopBarProps) {
   return (
     <div
+      data-testid="top-bar"
+      data-highlighted={isHighlighted}
       style={{
         position: "absolute",
         top: 0,
