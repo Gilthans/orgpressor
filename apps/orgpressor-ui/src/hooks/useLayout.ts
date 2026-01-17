@@ -9,7 +9,11 @@ import {
   ROOT_Y_IN_TOP_BAR,
 } from "../config";
 import { getRootNodeIds } from "../utils/hierarchy";
-import { getNetworkContainer, domToCanvasY } from "../utils/network";
+import {
+  getNetworkContainer,
+  domToCanvasY,
+  ensureRootsAtCorrectPosition,
+} from "../utils/network";
 
 interface UseLayoutProps {
   network: Network | null;
@@ -24,6 +28,8 @@ export function useLayout({
 }: UseLayoutProps): void {
   useEffect(() => {
     if (!network) return;
+
+    const container = getNetworkContainer(network);
 
     const arrangeNodes = () => {
       const allNodes = nodesDataSet.get();
@@ -71,7 +77,6 @@ export function useLayout({
       if (hierarchyBottom === -Infinity) hierarchyBottom = 0;
 
       // Calculate how much to shift all nodes to put roots inside the top bar
-      const container = getNetworkContainer(network);
       const containerHeight = container.clientHeight;
 
       // Target Y position for roots (in canvas coordinates) - centered in top bar
@@ -150,8 +155,42 @@ export function useLayout({
     // Also run on initial load after a short delay
     const timeoutId = setTimeout(arrangeNodes, 100);
 
+    // Enforce invariant: roots must always be at ROOT_Y_IN_TOP_BAR in DOM
+    // This runs after every vis-network render to correct any drift
+    const enforceRootPosition = () => {
+      ensureRootsAtCorrectPosition(network, nodesDataSet, edgesDataSet);
+    };
+
+    network.on("afterDrawing", enforceRootPosition);
+
+    // Handle container resize
+    let previousWidth = container.clientWidth;
+    let previousHeight = container.clientHeight;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      const { width: newWidth, height: newHeight } = entry.contentRect;
+
+      // Skip if no actual size change or invalid dimensions
+      if ((previousWidth === newWidth && previousHeight === newHeight) || newHeight === 0 || newWidth === 0) {
+        return;
+      }
+
+      // Update canvas dimensions - this will trigger afterDrawing which enforces root position
+      network.redraw();
+
+      previousWidth = newWidth;
+      previousHeight = newHeight;
+    });
+
+    resizeObserver.observe(container);
+
     return () => {
       clearTimeout(timeoutId);
+      network.off("afterDrawing", enforceRootPosition);
+      resizeObserver.disconnect();
     };
   }, [network, nodesDataSet, edgesDataSet]);
 }

@@ -137,6 +137,9 @@ declare module "vis-network/standalone" {
     selectNodes(nodeIds: (string | number)[]): void;
     unselectAll(): void;
 
+    redraw(): void;
+    fit(options?: { animation?: boolean | { duration?: number; easingFunction?: string } }): void;
+
     destroy(): void;
   }
 }
