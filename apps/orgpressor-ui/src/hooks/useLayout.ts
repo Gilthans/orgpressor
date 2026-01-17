@@ -80,7 +80,9 @@ export function useLayout({
       // Shift all connected nodes and mark roots
       const connectedUpdates: VisNode[] = connectedNodes.map((node) => ({
         id: node.id,
+        name: node.name,
         label: node.label,
+        metadata: node.metadata,
         x: positions[node.id]?.x ?? 0,
         y: (positions[node.id]?.y ?? 0) + yShift,
         isRoot: rootNodeIds.has(node.id) || node.isRoot,
@@ -99,7 +101,9 @@ export function useLayout({
 
         return {
           id: node.id,
+          name: node.name,
           label: node.label,
+          metadata: node.metadata,
           x: startX + col * FREE_NODES_SPACING,
           y: freeNodesStartY + row * FREE_NODES_SPACING,
         };

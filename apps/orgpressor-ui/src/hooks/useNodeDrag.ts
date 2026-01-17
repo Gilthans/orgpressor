@@ -47,7 +47,9 @@ function setNodeHighlight(
   if (node) {
     nodesDataSet.update({
       id: nodeId,
+      name: node.name,
       label: node.label,
+      metadata: node.metadata,
       color,
     } as VisNode);
   }
@@ -332,7 +334,9 @@ export function useNodeDrag({
         if (node?.isRoot) {
           nodesDataSet.update({
             id: nodeId,
+            name: node.name,
             label: node.label,
+            metadata: node.metadata,
             isRoot: false,
           });
         }

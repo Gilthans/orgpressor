@@ -57,10 +57,13 @@ export function createSubtreeMoveUpdates(
 ): VisNode[] {
   const { rootId, descendantIds, relativePositions } = subtree;
 
+  const rootNode = nodesDataSet.get(rootId);
   const updates: VisNode[] = [
     {
       id: rootId,
-      label: nodesDataSet.get(rootId)?.label || "",
+      name: rootNode?.name || "",
+      label: rootNode?.label || "",
+      metadata: rootNode?.metadata,
       x: newX,
       y: newY,
       ...rootProps,
@@ -70,9 +73,12 @@ export function createSubtreeMoveUpdates(
   descendantIds.forEach((id) => {
     const rel = relativePositions[id];
     if (rel) {
+      const node = nodesDataSet.get(id);
       updates.push({
         id,
-        label: nodesDataSet.get(id)?.label || "",
+        name: node?.name || "",
+        label: node?.label || "",
+        metadata: node?.metadata,
         x: newX + rel.dx,
         y: newY + rel.dy,
       });

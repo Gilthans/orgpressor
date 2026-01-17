@@ -45,7 +45,9 @@ export function createPositionUpdates(
     .filter((node) => !excludeSet.has(node.id))
     .map((node) => ({
       id: node.id,
+      name: node.name,
       label: node.label,
+      metadata: node.metadata,
       x: positions[node.id]?.x ?? 0,
       y: positions[node.id]?.y ?? 0,
     }));
