@@ -56,8 +56,11 @@ packages/           # Shared packages (future)
 
 ## Commands
 
+From monorepo root:
 ```bash
-pnpm dev      # Start development server
-pnpm build    # Build for production
+pnpm dev      # Start all dev servers
+pnpm build    # Build all packages
 pnpm lint     # Run linting
 ```
+
+See `apps/orgpressor-ui/CLAUDE.md` for app-specific commands and implementation details.
