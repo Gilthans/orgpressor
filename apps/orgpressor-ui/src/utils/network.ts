@@ -1,6 +1,5 @@
 import type { Network, DataSet } from "vis-network/standalone";
 import type { VisNode, VisEdge } from "../types";
-import { TOP_BAR_NODE_ID } from "../config";
 import { getRootNodeIds } from "./hierarchy";
 
 /**
@@ -47,7 +46,6 @@ export function findRootNodesMinY(
 
   // Check nodes that are roots by hierarchy (no incoming edges)
   rootIds.forEach((id) => {
-    if (id === TOP_BAR_NODE_ID) return; // Exclude top bar node
     const pos = positions[id];
     if (pos && pos.y < minY) {
       minY = pos.y;
@@ -56,7 +54,7 @@ export function findRootNodesMinY(
 
   // Also check nodes explicitly marked as isRoot
   nodesDataSet.get().forEach((node) => {
-    if (node.isRoot && node.id !== TOP_BAR_NODE_ID) {
+    if (node.isRoot) {
       const pos = positions[node.id];
       if (pos && pos.y < minY) {
         minY = pos.y;

@@ -1,10 +1,8 @@
 import type { Network, DataSet } from "vis-network/standalone";
-import { useRef, useState, useCallback, useEffect } from "react";
-import { formatNodeLabel, updateNode } from "../types";
+import { useRef, useCallback, useEffect } from "react";
 import type {
   PersonNode,
   HierarchyEdge,
-  NodeMetadata,
   GraphChangeData,
   VisNode,
   VisEdge,
@@ -12,10 +10,10 @@ import type {
   NodeStateInfo,
   EdgeStateInfo,
 } from "../types";
-import { networkOptions, TOP_BAR_NODE_ID } from "../config";
-import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints, useInitialViewPosition, useCanvasTopBar } from "../hooks";
+import { networkOptions } from "../config";
+import { useVisNetwork, useLayout, useViewConstraints, useInitialViewPosition } from "../hooks";
 import { extractGraphState } from "../utils/graphState";
-import { EditNodeDialog } from "./EditNodeDialog";
+import { HierarchicalNetworkEditor } from "./HierarchicalNetworkEditor";
 
 
 /**
@@ -28,7 +26,7 @@ function createGraphAccessor(
 ): GraphAccessor {
   return {
     getNodes(): NodeStateInfo[] {
-      const nodes = nodesDataSet.get().filter((node) => node.id !== TOP_BAR_NODE_ID);
+      const nodes = nodesDataSet.get();
       const positions = network.getPositions();
 
       return nodes.map((node) => {
@@ -46,7 +44,6 @@ function createGraphAccessor(
     getEdges(): EdgeStateInfo[] {
       return edgesDataSet
         .get()
-        .filter((edge) => edge.from !== TOP_BAR_NODE_ID && edge.to !== TOP_BAR_NODE_ID)
         .map((edge) => ({
           id: edge.id,
           from: edge.from,
@@ -75,8 +72,6 @@ export function OrgGraph({
   onReady
 }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
 
   const { network, nodesDataSet, edgesDataSet } = useVisNetwork({
     containerRef,
@@ -91,30 +86,11 @@ export function OrgGraph({
     edgesDataSet,
   });
 
-  const handleTopBarHighlight = useCallback((highlighted: boolean) => {
-    setIsTopBarHighlighted(highlighted);
-  }, []);
-
   const notifyChange = useCallback(() => {
     if (onChange) {
       onChange(extractGraphState(nodesDataSet, edgesDataSet));
     }
   }, [onChange, nodesDataSet, edgesDataSet]);
-
-  useNodeDrag({
-    network,
-    nodesDataSet,
-    edgesDataSet,
-    onTopBarHighlight: handleTopBarHighlight,
-    onHierarchyChange: notifyChange,
-  });
-
-  useCanvasTopBar({
-    network,
-    canvasTopY: 0,
-    height: 100,
-    isHighlighted: isTopBarHighlighted,
-  });
 
   useViewConstraints({
     network,
@@ -127,35 +103,13 @@ export function OrgGraph({
     edgesDataSet,
   });
 
-  // Handle double-click to edit node metadata
-  useEffect(() => {
-    if (!network) return;
-
-    const handleDoubleClick = (params: { nodes: (string | number)[] }) => {
-      if (params.nodes.length === 1) {
-        const nodeId = params.nodes[0] as string;
-        // Don't allow editing the top bar node
-        if (nodeId !== TOP_BAR_NODE_ID) {
-          setEditingNodeId(nodeId);
-        }
-      }
-    };
-
-    network.on("doubleClick", handleDoubleClick);
-    return () => {
-      network.off("doubleClick", handleDoubleClick);
-    };
-  }, [network]);
-
   // Handle node selection changes from vis-network
   useEffect(() => {
     if (!network) return;
 
     const handleClick = (params: { nodes: (string | number)[] }) => {
       const clickedNodeId = params.nodes.length === 1 ? (params.nodes[0] as string) : null;
-      // Don't report selection of the top bar node
-      const newSelectedId = clickedNodeId === TOP_BAR_NODE_ID ? null : clickedNodeId;
-      onSelectedNodeChange?.(newSelectedId);
+      onSelectedNodeChange?.(clickedNodeId);
     };
 
     network.on("click", handleClick);
@@ -180,31 +134,6 @@ export function OrgGraph({
     }
   }, [network, selectedNodeId]);
 
-  const handleSaveMetadata = useCallback(
-    (metadata: NodeMetadata) => {
-      if (!editingNodeId) return;
-
-      const node = nodesDataSet.get(editingNodeId);
-      if (node) {
-        nodesDataSet.update(
-          updateNode(node, {
-            label: formatNodeLabel(node.name, metadata),
-            metadata,
-          })
-        );
-        notifyChange();
-      }
-      setEditingNodeId(null);
-    },
-    [editingNodeId, nodesDataSet, notifyChange]
-  );
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingNodeId(null);
-  }, []);
-
-  const editingNode = editingNodeId ? nodesDataSet.get(editingNodeId) : null;
-
   // Create accessor and notify consumers when ready
   useEffect(() => {
     if (network && nodesDataSet && edgesDataSet) {
@@ -216,14 +145,14 @@ export function OrgGraph({
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
-      {editingNode && (
-        <EditNodeDialog
-          nodeName={editingNode.name}
-          metadata={editingNode.metadata || {}}
-          onSave={handleSaveMetadata}
-          onCancel={handleCancelEdit}
-        />
-      )}
+      <HierarchicalNetworkEditor
+        network={network}
+        nodesDataSet={nodesDataSet}
+        edgesDataSet={edgesDataSet}
+        topBarCanvasY={0}
+        topBarHeight={100}
+        onHierarchyChange={notifyChange}
+      />
     </div>
   );
 }

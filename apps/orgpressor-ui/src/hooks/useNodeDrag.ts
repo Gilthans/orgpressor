@@ -7,7 +7,6 @@ import {
   SNAP_OUT_THRESHOLD,
   HIGHLIGHT_COLOR,
   DEFAULT_NODE_COLOR,
-  TOP_BAR_NODE_ID,
   TOP_BAR_HEIGHT,
   ROOT_Y_IN_TOP_BAR,
   LEVEL_SEPARATION,
@@ -193,8 +192,6 @@ export function useNodeDrag({
 
       const nodeId = params.nodes[0] as string;
 
-      // Skip the top bar node - it should not be draggable
-      if (nodeId === TOP_BAR_NODE_ID) return;
       const isFree = isNodeFree(nodeId, nodesDataSet, edgesDataSet);
       const subtree = captureSubtree(network, edgesDataSet, nodeId);
       const positions = network.getPositions([nodeId]);

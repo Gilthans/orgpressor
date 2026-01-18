@@ -36,10 +36,6 @@ export const NODE_SPACING = 150;
 // Position roots centered vertically inside the top bar
 export const ROOT_Y_IN_TOP_BAR = TOP_BAR_HEIGHT / 2;
 
-// Top bar node configuration
-export const TOP_BAR_NODE_ID = "__TOP_BAR__";
-export const TOP_BAR_NODE_WIDTH = 20000; // Very wide to span the view
-
 export const networkOptions: Options = {
   layout: {
     hierarchical: {
@@ -48,7 +44,8 @@ export const networkOptions: Options = {
       sortMethod: "directed",
       levelSeparation: LEVEL_SEPARATION,
       nodeSpacing: NODE_SPACING,
-      shakeTowards: "roots"
+      // @ts-expect-error shakeTowards is valid but not in type definitions
+      shakeTowards: "roots",
     },
   },
   nodes: {

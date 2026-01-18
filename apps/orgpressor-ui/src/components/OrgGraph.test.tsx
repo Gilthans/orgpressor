@@ -58,6 +58,8 @@ describe("OrgGraph", () => {
     vi.mocked(hooks.useLayout).mockImplementation(() => {});
     vi.mocked(hooks.useNodeDrag).mockImplementation(() => {});
     vi.mocked(hooks.useViewConstraints).mockImplementation(() => {});
+    vi.mocked(hooks.useInitialViewPosition).mockImplementation(() => {});
+    vi.mocked(hooks.useCanvasTopBar).mockImplementation(() => {});
   });
 
   describe("rendering", () => {
@@ -196,7 +198,7 @@ describe("OrgGraph", () => {
   });
 
   describe("onChange callback", () => {
-    it("passes onHierarchyChange to useNodeDrag", () => {
+    it("useNodeDrag is called with onHierarchyChange via HierarchicalNetworkEditor", () => {
       const onChange = vi.fn();
 
       render(
@@ -207,7 +209,7 @@ describe("OrgGraph", () => {
         />
       );
 
-      // Verify useNodeDrag was called with onHierarchyChange
+      // Verify useNodeDrag was called (via HierarchicalNetworkEditor)
       expect(hooks.useNodeDrag).toHaveBeenCalledWith(
         expect.objectContaining({
           onHierarchyChange: expect.any(Function),

@@ -1,8 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { Network, DataSet } from "vis-network/standalone";
-import type { VisNode, VisEdge } from "../types";
-import { TOP_BAR_HEIGHT, TOP_BAR_COLOR, ROOT_Y_IN_TOP_BAR } from "../config";
-import { findRootNodesMinY } from "../utils/network";
+import type { Network } from "vis-network/standalone";
+import { TOP_BAR_COLOR } from "../config";
 
 interface UseCanvasTopBarProps {
   network: Network | null;
