@@ -1,7 +1,9 @@
+import { useState, useMemo } from "react";
 import { OrgGraph } from "orgpressor-ui";
 import type { PersonNode, HierarchyEdge } from "orgpressor-ui";
+import { generateGraphData } from "./utils/generateGraphData";
 
-const sampleNodes: PersonNode[] = [
+const defaultNodes: PersonNode[] = [
   { id: "1", label: "Alice Chen" },
   { id: "2", label: "Bob Smith" },
   { id: "3", label: "Carol Johnson" },
@@ -10,14 +12,60 @@ const sampleNodes: PersonNode[] = [
   { id: "6", label: "Frank Brown" },
 ];
 
-const sampleEdges: HierarchyEdge[] = [
+const defaultEdges: HierarchyEdge[] = [
   { from: "1", to: "2" },
   { from: "1", to: "3" },
   { from: "2", to: "4" },
   { from: "2", to: "5" },
 ];
 
+const inputStyle: React.CSSProperties = {
+  width: "60px",
+  padding: "4px 8px",
+  border: "1px solid #ccc",
+  borderRadius: "4px",
+  fontSize: "14px",
+};
+
+const buttonStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  background: "#1976d2",
+  color: "white",
+  border: "none",
+  borderRadius: "4px",
+  cursor: "pointer",
+  fontSize: "14px",
+  fontWeight: 500,
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  ...buttonStyle,
+  background: "#666",
+};
+
 function App() {
+  const [numDags, setNumDags] = useState(1);
+  const [nodesPerDag, setNodesPerDag] = useState(7);
+  const [numFreeNodes, setNumFreeNodes] = useState(5);
+  const [seed, setSeed] = useState(() => Date.now());
+  const [useDefault, setUseDefault] = useState(true);
+
+  const { nodes, edges } = useMemo(() => {
+    if (useDefault) {
+      return { nodes: defaultNodes, edges: defaultEdges };
+    }
+    return generateGraphData({ numDags, nodesPerDag, numFreeNodes, seed });
+  }, [useDefault, numDags, nodesPerDag, numFreeNodes, seed]);
+
+  const handleGenerate = () => {
+    setUseDefault(false);
+    setSeed(Date.now());
+  };
+
+  const handleReset = () => {
+    setUseDefault(true);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
@@ -40,6 +88,7 @@ function App() {
             padding: "16px",
             borderRight: "1px solid #e0e0e0",
             backgroundColor: "#fafafa",
+            overflowY: "auto",
           }}
         >
           <h2 style={{ fontSize: "16px", marginTop: 0 }}>Instructions</h2>
@@ -51,17 +100,64 @@ function App() {
             <li>Double-click to edit metadata</li>
           </ul>
 
-          <h2 style={{ fontSize: "16px" }}>Sample Data</h2>
-          <p style={{ fontSize: "14px", color: "#666" }}>
-            {sampleNodes.length} nodes, {sampleEdges.length} edges
-          </p>
-          <p style={{ fontSize: "14px", color: "#666" }}>
-            Frank Brown starts as a free node (no connections)
-          </p>
+          <h2 style={{ fontSize: "16px" }}>Data Generator</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <label style={{ fontSize: "14px" }}>DAGs:</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={numDags}
+                onChange={(e) => setNumDags(Math.max(1, parseInt(e.target.value) || 1))}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <label style={{ fontSize: "14px" }}>Nodes per DAG:</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={nodesPerDag}
+                onChange={(e) => setNodesPerDag(Math.max(1, parseInt(e.target.value) || 1))}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <label style={{ fontSize: "14px" }}>Free nodes:</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={numFreeNodes}
+                onChange={(e) => setNumFreeNodes(Math.max(0, parseInt(e.target.value) || 0))}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+              <button onClick={handleGenerate} style={buttonStyle}>
+                Generate
+              </button>
+              <button onClick={handleReset} style={secondaryButtonStyle}>
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #ddd" }}>
+            <h2 style={{ fontSize: "16px", marginTop: 0 }}>Current Data</h2>
+            <p style={{ fontSize: "14px", color: "#666", margin: "8px 0" }}>
+              {useDefault ? "Using default sample data" : "Using generated data"}
+            </p>
+            <p style={{ fontSize: "14px", color: "#666", margin: 0 }}>
+              {nodes.length} nodes, {edges.length} edges
+            </p>
+          </div>
         </aside>
 
         <main style={{ flex: 1, position: "relative" }}>
-          <OrgGraph nodes={sampleNodes} edges={sampleEdges} />
+          <OrgGraph key={seed} nodes={nodes} edges={edges} />
         </main>
       </div>
 
