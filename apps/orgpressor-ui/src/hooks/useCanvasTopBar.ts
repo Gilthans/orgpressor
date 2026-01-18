@@ -6,8 +6,8 @@ import { findRootNodesMinY } from "../utils/network";
 
 interface UseCanvasTopBarProps {
   network: Network | null;
-  nodesDataSet: DataSet<VisNode>;
-  edgesDataSet: DataSet<VisEdge>;
+  canvasTopY: number;
+  height: number;
   isHighlighted: boolean;
 }
 
@@ -20,8 +20,8 @@ const TOP_BAR_HORIZONTAL_EXTENT = 10000;
  */
 export function useCanvasTopBar({
   network,
-  nodesDataSet,
-  edgesDataSet,
+  canvasTopY,
+  height,
   isHighlighted,
 }: UseCanvasTopBarProps): void {
   // Use ref to track highlight state so the callback always has current value
@@ -32,18 +32,8 @@ export function useCanvasTopBar({
     if (!network) return;
 
     const drawTopBar = (ctx: CanvasRenderingContext2D) => {
-      // Find where roots are positioned in canvas coordinates
-      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet);
-
-      // If no roots, use a default position based on where roots would be
-      const rootCanvasY = rootMinY ?? 0;
-
-      // Top bar extends from above the root to below it
-      // Root is centered in the top bar, so:
-      // - Top of bar: rootCanvasY - ROOT_Y_IN_TOP_BAR
-      // - Bottom of bar: rootCanvasY + (TOP_BAR_HEIGHT - ROOT_Y_IN_TOP_BAR)
-      const topBarTop = rootCanvasY - ROOT_Y_IN_TOP_BAR;
-      const topBarBottom = rootCanvasY + (TOP_BAR_HEIGHT - ROOT_Y_IN_TOP_BAR);
+      const topBarTop = canvasTopY;
+      const topBarBottom = canvasTopY + height;
 
       // Draw the background
       ctx.fillStyle = isHighlightedRef.current
@@ -72,9 +62,8 @@ export function useCanvasTopBar({
     return () => {
       network.off("beforeDrawing", drawTopBar);
     };
-  }, [network, nodesDataSet, edgesDataSet]);
+  }, [network]);
 
-  // Force redraw when highlight state changes
   useEffect(() => {
     if (network) {
       network.redraw();

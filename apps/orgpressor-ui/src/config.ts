@@ -79,7 +79,7 @@ export const networkOptions: Options = {
   },
   interaction: {
     dragNodes: true,
-    dragView: false, // Disabled - custom X-only panning in useViewConstraints
-    zoomView: false, // Disabled - custom zoom that keeps top fixed in useViewConstraints
+    dragView: true, // Disabled - custom X-only panning in useViewConstraints
+    zoomView: true, // Disabled - custom zoom that keeps top fixed in useViewConstraints
   },
 };

@@ -12,11 +12,10 @@ import type {
   NodeStateInfo,
   EdgeStateInfo,
 } from "../types";
-import { networkOptions, TOP_BAR_NODE_ID, ROOT_Y_IN_TOP_BAR } from "../config";
+import { networkOptions, TOP_BAR_NODE_ID } from "../config";
 import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints, useInitialViewPosition, useCanvasTopBar } from "../hooks";
 import { extractGraphState } from "../utils/graphState";
 import { EditNodeDialog } from "./EditNodeDialog";
-import { findRootNodesMinY, getNetworkContainer } from "../utils/network";
 
 
 /**
@@ -110,42 +109,22 @@ export function OrgGraph({
     onHierarchyChange: notifyChange,
   });
 
-  // Calculate view bounds based on root node positions
-  // This callback is used by useViewConstraints to enforce pan/zoom limits
-  const getViewBounds = useCallback(
-    (scale: number) => {
-      if (!network) return {};
-
-      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet);
-      if (rootMinY === undefined) return {};
-
-      const container = getNetworkContainer(network);
-      const containerHeight = container.clientHeight;
-
-      // Calculate minY: the viewY where roots appear at ROOT_Y_IN_TOP_BAR from top
-      const minY = rootMinY - (ROOT_Y_IN_TOP_BAR - containerHeight / 2) / scale;
-
-      return { minY };
-    },
-    [network, nodesDataSet, edgesDataSet]
-  );
+  useCanvasTopBar({
+    network,
+    canvasTopY: 0,
+    height: 100,
+    isHighlighted: isTopBarHighlighted,
+  });
 
   useViewConstraints({
     network,
-    getViewBounds,
+    viewBounds: { minY: 0 },
   });
 
   useInitialViewPosition({
     network,
     nodesDataSet,
     edgesDataSet,
-  });
-
-  useCanvasTopBar({
-    network,
-    nodesDataSet,
-    edgesDataSet,
-    isHighlighted: isTopBarHighlighted,
   });
 
   // Handle double-click to edit node metadata
