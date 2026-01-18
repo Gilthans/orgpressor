@@ -6,11 +6,16 @@ import * as hooks from "../hooks";
 // Mock the hooks module
 vi.mock("../hooks", () => ({
   useVisNetwork: vi.fn(),
-  useLayout: vi.fn(),
   useNodeDrag: vi.fn(),
   useViewConstraints: vi.fn(),
-  useInitialViewPosition: vi.fn(),
   useCanvasTopBar: vi.fn(),
+}));
+
+// Mock LayoutCalculator from layout module specifically
+vi.mock("../utils/layout", () => ({
+  LayoutCalculator: class MockLayoutCalculator {
+    reapplyLayout = vi.fn();
+  },
 }));
 
 describe("OrgGraph", () => {
@@ -55,10 +60,8 @@ describe("OrgGraph", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    vi.mocked(hooks.useLayout).mockImplementation(() => {});
     vi.mocked(hooks.useNodeDrag).mockImplementation(() => {});
     vi.mocked(hooks.useViewConstraints).mockImplementation(() => {});
-    vi.mocked(hooks.useInitialViewPosition).mockImplementation(() => {});
     vi.mocked(hooks.useCanvasTopBar).mockImplementation(() => {});
   });
 

@@ -1,4 +1,6 @@
+import type { Network, DataSet } from "vis-network/standalone";
 import type { VisNode, VisEdge } from "../types";
+import { updateNode } from "../types";
 
 /**
  * Position with x and y coordinates
@@ -18,6 +20,10 @@ export interface LayoutConfig {
   freeNodesTopMargin: number;
   /** Spacing between free nodes in the grid */
   freeNodesSpacing: number;
+  /** DataSet containing nodes */
+  nodesDataSet: DataSet<VisNode>;
+  /** DataSet containing edges */
+  edgesDataSet: DataSet<VisEdge>;
 }
 
 /**
@@ -129,11 +135,61 @@ export class LayoutCalculator {
   private readonly targetRootY: number;
   private readonly freeNodesTopMargin: number;
   private readonly freeNodesSpacing: number;
+  private readonly nodesDataSet: DataSet<VisNode>;
+  private readonly edgesDataSet: DataSet<VisEdge>;
 
   constructor(config: LayoutConfig) {
     this.targetRootY = config.targetRootY;
     this.freeNodesTopMargin = config.freeNodesTopMargin;
     this.freeNodesSpacing = config.freeNodesSpacing;
+    this.nodesDataSet = config.nodesDataSet;
+    this.edgesDataSet = config.edgesDataSet;
+  }
+
+  /**
+   * Apply layout to the network.
+   * @param network The vis-network instance
+   * @param reapplyHierarchy If true, waits for vis.js hierarchical layout to stabilize first
+   */
+  reapplyLayout(network: Network, reapplyHierarchy = false): void {
+    const applyLayout = () => {
+      const nodes = this.nodesDataSet.get();
+      const edges = this.edgesDataSet.get();
+
+      if (nodes.length === 0) return;
+
+      // Get positions from vis.js
+      const positions = network.getPositions();
+
+      // Calculate final layout
+      const layout = this.calculate({ nodes, edges, positions });
+
+      // Apply positions to nodes
+      const updates = nodes.map((node) => {
+        const pos = layout.positions[node.id];
+        return updateNode(node, {
+          x: pos?.x ?? 0,
+          y: pos?.y ?? 0,
+          isRoot: layout.rootIds.has(node.id) || node.isRoot,
+        });
+      });
+
+      this.nodesDataSet.update(updates);
+
+      // Fit view to show all nodes
+      network.fit({
+        animation: false,
+      });
+    };
+
+    if (reapplyHierarchy) {
+      // Wait for hierarchical layout to complete
+      network.once("stabilized", applyLayout);
+      // Also run after a short delay in case stabilized doesn't fire
+      setTimeout(applyLayout, 100);
+    } else {
+      applyLayout();
+    }
   }
 
   /**

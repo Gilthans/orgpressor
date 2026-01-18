@@ -302,9 +302,7 @@ export function useNodeDrag({
       // No node overlap - check if over top bar zone using coordinates
       // Use node's bounding box TOP edge, not center, so highlight triggers on intersection
       const nodeTopEdgeY = draggedBox.top;
-      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet) ?? 0;
-      const topBarBottom = rootMinY + (TOP_BAR_HEIGHT - ROOT_Y_IN_TOP_BAR);
-      const isOverTopBar = nodeTopEdgeY < topBarBottom;
+      const isOverTopBar = nodeTopEdgeY < TOP_BAR_HEIGHT;
 
       if (isOverTopBar !== dragState.current!.isOverTopBar) {
         dragState.current!.isOverTopBar = isOverTopBar;

@@ -16,7 +16,7 @@ export const DEFAULT_NODE_COLOR = {
 };
 
 // Top bar configuration for creating root nodes
-export const TOP_BAR_HEIGHT = 60;
+export const TOP_BAR_HEIGHT = 100;
 export const TOP_BAR_COLOR = {
   background: "rgba(227, 242, 253, 0.3)",
   border: "#1976d2",
@@ -31,9 +31,6 @@ export const FREE_NODES_SPACING = 120;
 // Hierarchical layout settings (also used in networkOptions below)
 export const LEVEL_SEPARATION = 100;
 export const NODE_SPACING = 150;
-
-// Position roots centered vertically inside the top bar
-export const ROOT_Y_IN_TOP_BAR = TOP_BAR_HEIGHT / 2;
 
 export const networkOptions: Options = {
   layout: {

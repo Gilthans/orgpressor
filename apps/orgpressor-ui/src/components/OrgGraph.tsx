@@ -1,5 +1,5 @@
 import type { Network, DataSet } from "vis-network/standalone";
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import type {
   PersonNode,
   HierarchyEdge,
@@ -10,9 +10,13 @@ import type {
   NodeStateInfo,
   EdgeStateInfo,
 } from "../types";
-import { networkOptions } from "../config";
-import { useVisNetwork, useLayout, useViewConstraints, useInitialViewPosition } from "../hooks";
-import { extractGraphState, validateNoCycles } from "../utils";
+import {
+  networkOptions,
+  FREE_NODES_TOP_MARGIN,
+  FREE_NODES_SPACING, TOP_BAR_HEIGHT,
+} from "../config";
+import { useVisNetwork, useViewConstraints } from "../hooks";
+import { extractGraphState, validateNoCycles, LayoutCalculator } from "../utils";
 import { HierarchicalNetworkEditor } from "./HierarchicalNetworkEditor";
 
 
@@ -83,11 +87,22 @@ export function OrgGraph({
     options: networkOptions,
   });
 
-  useLayout({
-    network,
-    nodesDataSet,
-    edgesDataSet,
-  });
+  // Create layout calculator once datasets are available
+  const layoutCalculator = useMemo(() => {
+    return new LayoutCalculator({
+      targetRootY: TOP_BAR_HEIGHT / 2,
+      freeNodesTopMargin: FREE_NODES_TOP_MARGIN,
+      freeNodesSpacing: FREE_NODES_SPACING,
+      nodesDataSet,
+      edgesDataSet,
+    });
+  }, [nodesDataSet, edgesDataSet]);
+
+  // Apply initial layout when network is ready
+  useEffect(() => {
+    if (!network) return;
+    layoutCalculator.reapplyLayout(network, true);
+  }, [network, layoutCalculator]);
 
   const notifyChange = useCallback(() => {
     if (onChange) {
@@ -98,12 +113,6 @@ export function OrgGraph({
   useViewConstraints({
     network,
     viewBounds: { minY: 0 },
-  });
-
-  useInitialViewPosition({
-    network,
-    nodesDataSet,
-    edgesDataSet,
   });
 
   // Handle node selection changes from vis-network
@@ -153,7 +162,7 @@ export function OrgGraph({
         nodesDataSet={nodesDataSet}
         edgesDataSet={edgesDataSet}
         topBarCanvasY={0}
-        topBarHeight={100}
+        topBarHeight={TOP_BAR_HEIGHT}
         onHierarchyChange={notifyChange}
       />
     </div>
