@@ -144,4 +144,6 @@ export interface GraphAccessor {
   getNodes(): NodeStateInfo[];
   /** Get all edges with their connection info. */
   getEdges(): EdgeStateInfo[];
+  /** Convert DOM coordinates (relative to container) to canvas coordinates. */
+  domToCanvas(position: Position): Position;
 }

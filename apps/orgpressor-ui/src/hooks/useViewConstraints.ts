@@ -40,9 +40,8 @@ export function useViewConstraints({
     if (!network) return;
     const container = getNetworkContainer(network);
     const currentPos = network.getViewPosition();
-    const boundingRectDom = container.getBoundingClientRect();
-    const canvasTopLeft = network.DOMtoCanvas({x: boundingRectDom.left, y: boundingRectDom.top});
-    const canvasBottomRight = network.DOMtoCanvas({x: boundingRectDom.right, y: boundingRectDom.bottom});
+    const canvasTopLeft = network.DOMtoCanvas({x: 0, y: 0});
+    const canvasBottomRight = network.DOMtoCanvas({x: container.clientWidth, y: container.clientHeight});
 
     let changeY = 0;
     if (canvasTopLeft.y < actualViewBounds.minY) {

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { OrgGraph } from "orgpressor-ui";
-import type { PersonNode, HierarchyEdge } from "orgpressor-ui";
+import type { PersonNode, HierarchyEdge, GraphAccessor } from "orgpressor-ui";
 import { generateGraphData } from "./utils/generateGraphData";
 
 const defaultNodes: PersonNode[] = [
@@ -49,6 +49,27 @@ function App() {
   const [numFreeNodes, setNumFreeNodes] = useState(5);
   const [seed, setSeed] = useState(() => Date.now());
   const [useDefault, setUseDefault] = useState(true);
+  const [canvasPos, setCanvasPos] = useState<{ x: number; y: number } | null>(null);
+  const graphAccessorRef = useRef<GraphAccessor | null>(null);
+
+  const handleReady = useCallback((accessor: GraphAccessor) => {
+    graphAccessorRef.current = accessor;
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!graphAccessorRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const domPos = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    const canvas = graphAccessorRef.current.domToCanvas(domPos);
+    setCanvasPos({ x: Math.round(canvas.x), y: Math.round(canvas.y) });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setCanvasPos(null);
+  }, []);
 
   const { nodes, edges } = useMemo(() => {
     if (useDefault) {
@@ -154,10 +175,21 @@ function App() {
               {nodes.length} nodes, {edges.length} edges
             </p>
           </div>
+
+          <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #ddd" }}>
+            <h2 style={{ fontSize: "16px", marginTop: 0 }}>Mouse Position</h2>
+            <p style={{ fontSize: "14px", color: "#666", margin: 0, fontFamily: "monospace" }}>
+              {canvasPos ? `X: ${canvasPos.x}, Y: ${canvasPos.y}` : "Hover over graph"}
+            </p>
+          </div>
         </aside>
 
-        <main style={{ flex: 1, position: "relative" }}>
-          <OrgGraph key={seed} nodes={nodes} edges={edges} />
+        <main
+          style={{ flex: 1, position: "relative" }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          <OrgGraph key={seed} nodes={nodes} edges={edges} onReady={handleReady} />
         </main>
       </div>
 

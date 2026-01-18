@@ -8,7 +8,6 @@ import {
   HIGHLIGHT_COLOR,
   DEFAULT_NODE_COLOR,
   TOP_BAR_HEIGHT,
-  ROOT_Y_IN_TOP_BAR,
   LEVEL_SEPARATION,
   NODE_SPACING,
 } from "../config";
@@ -24,7 +23,7 @@ import {
   createPositionUpdates,
   boxesOverlap,
 } from "../utils/positions";
-import { domToCanvasY, findRootNodesMinY } from "../utils/network";
+import { domToCanvasY } from "../utils/network";
 import {
   captureSubtree,
   createSubtreeMoveUpdates,

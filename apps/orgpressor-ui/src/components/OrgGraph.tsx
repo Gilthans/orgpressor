@@ -55,6 +55,18 @@ function createGraphAccessor(
           dashes: edge.dashes || false,
         }));
     },
+
+    domToCanvas(position: { x: number; y: number }): { x: number; y: number } {
+      // vis-network DOMtoCanvas expects window-relative coordinates
+      // We receive container-relative, so add container offset
+      const container = (network as unknown as { body: { container: HTMLElement } }).body.container;
+      const rect = container.getBoundingClientRect();
+      const windowRelative = {
+        x: position.x + rect.left,
+        y: position.y + rect.top,
+      };
+      return network.DOMtoCanvas(windowRelative);
+    },
   };
 }
 

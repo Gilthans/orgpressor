@@ -42,13 +42,6 @@ export interface LayoutInput {
 export interface LayoutOutput {
   /** Final positions for all nodes */
   positions: Record<string, Position>;
-  /** Bounding box of all nodes */
-  bounds: {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-  };
   /** IDs of nodes identified as roots */
   rootIds: Set<string>;
 }
@@ -163,6 +156,7 @@ export class LayoutCalculator {
 
       // Calculate final layout
       const layout = this.calculate({ nodes, edges, positions });
+      console.log(layout);
 
       // Apply positions to nodes
       const updates = nodes.map((node) => {
@@ -217,18 +211,21 @@ export class LayoutCalculator {
 
     // Separate nodes
     const freeNodes = nodes.filter(
-      (node) => !connectedNodeIds.has(node.id) && !node.isRoot
+      (node) => !connectedNodeIds.has(node.id)
     );
     const connectedNodes = nodes.filter(
-      (node) => connectedNodeIds.has(node.id) || node.isRoot
+      (node) => connectedNodeIds.has(node.id)
     );
 
     const result: Record<string, Position> = {};
 
     // Calculate Y shifts for connected nodes to align roots at targetRootY
     let hierarchyBottom = -Infinity;
+    let hierarchyCenterX = 0;
 
     if (connectedNodes.length > 0) {
+      let hierarchyMinX = Infinity;
+      let hierarchyMaxX = -Infinity;
       if (rootIds.size > 1) {
         // Multiple DAGs: each DAG gets its own shift
         const nodeYShifts = new Map<string, number>();
@@ -250,10 +247,13 @@ export class LayoutCalculator {
           const pos = positions[node.id];
           const yShift = nodeYShifts.get(node.id) ?? 0;
           const newY = (pos?.y ?? 0) + yShift;
+          const newX = pos?.x ?? 0;
           result[node.id] = {
-            x: pos?.x ?? 0,
+            x: newX,
             y: newY,
           };
+          hierarchyMinX = Math.min(hierarchyMinX, newX);
+          hierarchyMaxX = Math.max(hierarchyMaxX, newX);
           if (newY > hierarchyBottom) hierarchyBottom = newY;
         });
       } else {
@@ -270,14 +270,22 @@ export class LayoutCalculator {
 
         connectedNodes.forEach((node) => {
           const pos = positions[node.id];
+          const newX = pos?.x ?? 0;
           result[node.id] = {
-            x: pos?.x ?? 0,
+            x: newX,
             y: (pos?.y ?? 0) + yShift,
           };
+          hierarchyMinX = Math.min(hierarchyMinX, newX);
+          hierarchyMaxX = Math.max(hierarchyMaxX, newX);
         });
 
         hierarchyBottom = hierarchyBottom + yShift;
       }
+      console.log("---")
+      console.log(hierarchyMinX);
+      console.log(hierarchyMaxX);
+      hierarchyCenterX = (hierarchyMinX + hierarchyMaxX)/2;
+      console.log(hierarchyCenterX);
     }
 
     if (hierarchyBottom === -Infinity) hierarchyBottom = this.targetRootY;
@@ -286,9 +294,11 @@ export class LayoutCalculator {
     const freeNodesStartY = hierarchyBottom + this.freeNodesTopMargin;
     const { cols } = calculateFreeNodesGrid(freeNodes.length);
 
+    console.log("Cols", cols);
+
     if (cols > 0) {
       const gridWidth = (cols - 1) * this.freeNodesSpacing;
-      const startX = -gridWidth / 2;
+      const startX = hierarchyCenterX - (gridWidth / 2);
 
       freeNodes.forEach((node, index) => {
         const row = Math.floor(index / cols);
@@ -300,27 +310,8 @@ export class LayoutCalculator {
       });
     }
 
-    // Calculate bounds
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-
-    Object.values(result).forEach((pos) => {
-      if (pos.x < minX) minX = pos.x;
-      if (pos.x > maxX) maxX = pos.x;
-      if (pos.y < minY) minY = pos.y;
-      if (pos.y > maxY) maxY = pos.y;
-    });
-
-    // Handle empty case
-    if (minX === Infinity) {
-      minX = maxX = minY = maxY = 0;
-    }
-
     return {
       positions: result,
-      bounds: { minX, maxX, minY, maxY },
       rootIds,
     };
   }
