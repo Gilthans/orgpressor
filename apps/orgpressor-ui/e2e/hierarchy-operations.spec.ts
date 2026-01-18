@@ -37,10 +37,8 @@ test.describe("Hierarchy Operations", () => {
       await orgChart.snapOutNode("Sarah Johnson", "down");
       await expectNotToBeConnected(orgChart, "John Smith", "Sarah Johnson");
 
-      // Make Sarah a root
-      const pos = await orgChart.getNodePosition("Sarah Johnson");
-      await orgChart.drag(pos.x, pos.y, 700, TOP_BAR_CENTER_Y);
-      await orgChart.waitForStableLayout();
+      // Make Sarah a root by dragging to top bar (use makeRoot for proper positioning)
+      await orgChart.makeRoot("Sarah Johnson", 800);
 
       await expectToBeRoot(orgChart, "Sarah Johnson");
       await expectRootCount(orgChart, 2);

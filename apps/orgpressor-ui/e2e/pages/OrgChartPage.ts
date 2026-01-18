@@ -249,9 +249,11 @@ export class OrgChartPage {
     targetLabel: string,
     direction: "down" | "up" | "left" | "right" = "down"
   ): Promise<void> {
-    const endPos = await this.snapOutNode(nodeLabel, direction);
+    await this.snapOutNode(nodeLabel, direction);
+    // Get actual positions after snap-out (layout may have shifted nodes)
+    const nodePos = await this.getNodePosition(nodeLabel);
     const targetPos = await this.getNodePosition(targetLabel);
-    await this.drag(endPos.x, endPos.y, targetPos.x, targetPos.y);
+    await this.drag(nodePos.x, nodePos.y, targetPos.x, targetPos.y);
     await this.waitForStableLayout();
   }
 
