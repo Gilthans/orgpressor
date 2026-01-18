@@ -10,16 +10,6 @@ export function getNetworkContainer(network: Network): HTMLElement {
 }
 
 /**
- * Convert canvas coordinates to DOM coordinates relative to container
- */
-export function canvasToDOMY(network: Network, canvasY: number): number {
-  const container = getNetworkContainer(network);
-  const canvasToDOM = network.canvasToDOM({ x: 0, y: canvasY });
-  const containerRect = container.getBoundingClientRect();
-  return canvasToDOM.y - containerRect.top;
-}
-
-/**
  * Convert DOM Y coordinate (relative to container top) to canvas Y
  */
 export function domToCanvasY(network: Network, domY: number): number {
@@ -32,7 +22,6 @@ export function domToCanvasY(network: Network, domY: number): number {
 /**
  * Find the minimum Y coordinate of root nodes (nodes at the top of the hierarchy).
  * Returns undefined if no roots are found.
- * Excludes the special top bar node.
  */
 export function findRootNodesMinY(
   network: Network,

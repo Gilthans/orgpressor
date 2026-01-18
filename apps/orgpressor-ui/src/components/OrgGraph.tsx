@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useLayout, useViewConstraints, useInitialViewPosition } from "../hooks";
-import { extractGraphState } from "../utils/graphState";
+import { extractGraphState } from "../utils";
 import { HierarchicalNetworkEditor } from "./HierarchicalNetworkEditor";
 
 

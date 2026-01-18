@@ -27,7 +27,6 @@ export const TOP_BAR_COLOR = {
 // Layout settings for free nodes
 export const FREE_NODES_TOP_MARGIN = 150;
 export const FREE_NODES_SPACING = 120;
-export const FREE_NODES_PER_ROW = 5;
 
 // Hierarchical layout settings (also used in networkOptions below)
 export const LEVEL_SEPARATION = 100;
@@ -76,7 +75,7 @@ export const networkOptions: Options = {
   },
   interaction: {
     dragNodes: true,
-    dragView: true, // Disabled - custom X-only panning in useViewConstraints
-    zoomView: true, // Disabled - custom zoom that keeps top fixed in useViewConstraints
+    dragView: true,
+    zoomView: true,
   },
 };
