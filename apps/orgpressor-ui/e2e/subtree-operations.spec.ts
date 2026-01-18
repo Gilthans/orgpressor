@@ -31,9 +31,9 @@ test.describe("Subtree Operations", () => {
       // Snap out Sarah (has children Emily and Robert)
       const endPos = await orgChart.snapOutNode("Sarah Johnson", "down");
 
-      // Make Sarah a root - her children should still be attached
+      // Make Sarah a root - drag straight up to top bar
       await orgChart.expectLayoutChanged(async () => {
-        await orgChart.drag(endPos.x, endPos.y, 800, TOP_BAR_CENTER_Y);
+        await orgChart.drag(endPos.x, endPos.y, endPos.x, TOP_BAR_CENTER_Y);
       });
     });
 
@@ -69,9 +69,9 @@ test.describe("Subtree Operations", () => {
       // Snap out Sarah first
       const endPos = await orgChart.snapOutNode("Sarah Johnson", "down");
 
-      // Now drag to top bar (to the right of existing root)
+      // Now drag straight up to top bar
       await orgChart.expectLayoutChanged(async () => {
-        await orgChart.drag(endPos.x, endPos.y, 700, TOP_BAR_CENTER_Y);
+        await orgChart.drag(endPos.x, endPos.y, endPos.x, TOP_BAR_CENTER_Y);
       });
     });
   });

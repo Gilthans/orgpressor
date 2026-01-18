@@ -5,11 +5,35 @@ import type { VisNode, VisEdge } from "../types";
 import {
   FREE_NODES_TOP_MARGIN,
   FREE_NODES_SPACING,
-  FREE_NODES_PER_ROW,
   ROOT_Y_IN_TOP_BAR,
 } from "../config";
 import { getRootNodeIds, getAllDescendantIds } from "../utils/hierarchy";
 import { getNetworkContainer, domToCanvasY, positionViewForRoots } from "../utils/network";
+
+/**
+ * Calculate optimal grid dimensions for free nodes.
+ * Grid should be square or horizontal (cols >= rows) to fit horizontal scrolling.
+ */
+function calculateFreeNodesGrid(nodeCount: number): { cols: number; rows: number } {
+  if (nodeCount === 0) return { cols: 0, rows: 0 };
+
+  // Start with a square-ish grid based on sqrt
+  const sqrt = Math.sqrt(nodeCount);
+  let rows = Math.floor(sqrt);
+  let cols = Math.ceil(nodeCount / rows);
+
+  // Ensure cols >= rows for horizontal/square shape
+  while (cols < rows && rows > 1) {
+    rows--;
+    cols = Math.ceil(nodeCount / rows);
+  }
+
+  // Safety check: ensure at least 1 row and 1 column
+  if (rows < 1) rows = 1;
+  if (cols < 1) cols = nodeCount;
+
+  return { cols, rows };
+}
 
 interface UseLayoutProps {
   network: Network | null;
@@ -140,13 +164,21 @@ export function useLayout({
       // Position free nodes in a grid below the shifted hierarchy
       // Note: hierarchyBottom has already been updated with shifts applied above
       const freeNodesStartY = hierarchyBottom + FREE_NODES_TOP_MARGIN;
-      const totalWidth =
-        (Math.min(freeNodes.length, FREE_NODES_PER_ROW) - 1) * FREE_NODES_SPACING;
-      const startX = -totalWidth / 2;
+
+      // Get optimal grid dimensions (square or horizontal)
+      // The grid will be as square as possible while maintaining cols >= rows
+      const { cols } = calculateFreeNodesGrid(freeNodes.length);
+
+      // Calculate grid width and center it at X=0
+      // Note: Centering on the hierarchy would be ideal but causes issues with
+      // coordinate transformations during drag operations. The view centering
+      // at the end of layout ensures all nodes are visible.
+      const gridWidth = (cols - 1) * FREE_NODES_SPACING;
+      const startX = -gridWidth / 2;
 
       const freeUpdates: VisNode[] = freeNodes.map((node, index) => {
-        const row = Math.floor(index / FREE_NODES_PER_ROW);
-        const col = index % FREE_NODES_PER_ROW;
+        const row = Math.floor(index / cols);
+        const col = index % cols;
 
         return updateNode(node, {
           x: startX + col * FREE_NODES_SPACING,
@@ -187,7 +219,7 @@ export function useLayout({
         });
 
         // Then position view so roots appear in the top bar (accounts for scale)
-        positionViewForRoots(network, nodesDataSet, edgesDataSet, { animate: true });
+        positionViewForRoots(network, nodesDataSet, edgesDataSet, { animate: false });
       }, 50);
     };
 

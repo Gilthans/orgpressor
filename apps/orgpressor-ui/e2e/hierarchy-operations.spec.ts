@@ -26,7 +26,8 @@ test.describe("Hierarchy Operations", () => {
     test("free node can become a root", async () => {
       await expectToBeFree(orgChart, "Jennifer Taylor");
 
-      await orgChart.makeRoot("Jennifer Taylor", 800);
+      // Drag straight up to top bar (no hardcoded X position)
+      await orgChart.makeRoot("Jennifer Taylor");
 
       await expectToBeRoot(orgChart, "Jennifer Taylor");
       await expectRootCount(orgChart, 2);
@@ -37,8 +38,8 @@ test.describe("Hierarchy Operations", () => {
       await orgChart.snapOutNode("Sarah Johnson", "down");
       await expectNotToBeConnected(orgChart, "John Smith", "Sarah Johnson");
 
-      // Make Sarah a root by dragging to top bar (use makeRoot for proper positioning)
-      await orgChart.makeRoot("Sarah Johnson", 800);
+      // Make Sarah a root by dragging straight up to top bar
+      await orgChart.makeRoot("Sarah Johnson");
 
       await expectToBeRoot(orgChart, "Sarah Johnson");
       await expectRootCount(orgChart, 2);
@@ -48,9 +49,9 @@ test.describe("Hierarchy Operations", () => {
       // Snap out John
       const endPos = await orgChart.snapOutNode("John Smith", "down");
 
-      // Drag back to top bar
+      // Drag back to top bar (use same X position, no hardcoded coordinates)
       await orgChart.expectLayoutChanged(async () => {
-        await orgChart.drag(endPos.x, endPos.y, 400, TOP_BAR_CENTER_Y);
+        await orgChart.drag(endPos.x, endPos.y, endPos.x, TOP_BAR_CENTER_Y);
       });
     });
   });
@@ -110,8 +111,8 @@ test.describe("Hierarchy Operations", () => {
     });
 
     test("node connects to newly created root", async () => {
-      // Make Jennifer a root
-      await orgChart.makeRoot("Jennifer Taylor", 800);
+      // Make Jennifer a root (drag straight up to top bar)
+      await orgChart.makeRoot("Jennifer Taylor");
 
       // Snap out Emily and connect to Jennifer
       await orgChart.expectLayoutChanged(async () => {

@@ -1,6 +1,5 @@
 import { test } from "@playwright/test";
 import { OrgChartPage } from "./pages/OrgChartPage";
-import { TOP_BAR_CENTER_Y } from "./test-utils";
 
 test.describe("Multiple Hierarchies", () => {
   let orgChart: OrgChartPage;
@@ -11,16 +10,15 @@ test.describe("Multiple Hierarchies", () => {
   });
 
   test("second root positioned to right of first", async () => {
-    const johnPos = await orgChart.getNodePosition("John Smith");
-
     await orgChart.expectLayoutChanged(async () => {
-      await orgChart.makeRoot("Jennifer Taylor", johnPos.x + 300);
+      // Drag straight up to top bar from current position
+      await orgChart.makeRoot("Jennifer Taylor");
     });
   });
 
   test("multiple roots layout independently", async () => {
     // Create Jennifer as a second root
-    await orgChart.makeRoot("Jennifer Taylor", 700);
+    await orgChart.makeRoot("Jennifer Taylor");
 
     // Add James as child of Jennifer (drag to Jennifer's position)
     await orgChart.expectLayoutChanged(async () => {
@@ -30,7 +28,7 @@ test.describe("Multiple Hierarchies", () => {
 
   test("merge trees by connecting root to other hierarchy", async () => {
     // Create Jennifer as a second root
-    await orgChart.makeRoot("Jennifer Taylor", 700);
+    await orgChart.makeRoot("Jennifer Taylor");
 
     // Snap out Jennifer and connect to Sarah (in John's hierarchy)
     await orgChart.expectLayoutChanged(async () => {
@@ -40,25 +38,27 @@ test.describe("Multiple Hierarchies", () => {
 
   test("snap out hierarchy and connect to another", async () => {
     // Create Jennifer as root with James as child
-    await orgChart.makeRoot("Jennifer Taylor", 700);
+    await orgChart.makeRoot("Jennifer Taylor");
     await orgChart.connectNodes("James Brown", "Jennifer Taylor");
 
     // Get Jennifer's position (she's now a root in top bar)
     const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
 
-    // Snap out Jennifer (with James) and connect under Michael
+    // Snap out Jennifer (with James) - drag down past threshold
     await orgChart.expectLayoutChanged(async () => {
-      await orgChart.drag(jenniferPos.x, jenniferPos.y, 700, 300);
+      const snapOutY = jenniferPos.y + 300;
+      await orgChart.drag(jenniferPos.x, jenniferPos.y, jenniferPos.x, snapOutY);
       await orgChart.waitForStableLayout();
 
+      // Connect under Michael
       const michaelPos = await orgChart.getNodePosition("Michael Chen");
-      await orgChart.drag(700, 300, michaelPos.x, michaelPos.y);
+      await orgChart.drag(jenniferPos.x, snapOutY, michaelPos.x, michaelPos.y);
     });
   });
 
   test("each hierarchy maintains own Y levels", async () => {
     // Create Jennifer as second root
-    await orgChart.makeRoot("Jennifer Taylor", 800);
+    await orgChart.makeRoot("Jennifer Taylor");
 
     // Add James as child of Jennifer
     await orgChart.connectNodes("James Brown", "Jennifer Taylor");
@@ -74,15 +74,15 @@ test.describe("Multiple Hierarchies", () => {
 
   test("removing root leaves other hierarchies intact", async () => {
     // Create Jennifer as second root with James as child
-    await orgChart.makeRoot("Jennifer Taylor", 800);
+    await orgChart.makeRoot("Jennifer Taylor");
     await orgChart.connectNodes("James Brown", "Jennifer Taylor");
 
     // Get Jennifer's position
     const jenniferPos = await orgChart.getNodePosition("Jennifer Taylor");
 
-    // Snap out Jennifer (making her free again, taking James)
+    // Snap out Jennifer (making her free again, taking James) - drag down past threshold
     await orgChart.expectLayoutChanged(async () => {
-      await orgChart.drag(jenniferPos.x, jenniferPos.y, 600, 450);
+      await orgChart.drag(jenniferPos.x, jenniferPos.y, jenniferPos.x, jenniferPos.y + 400);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { OrgChartPage } from "./pages/OrgChartPage";
-import { TOP_BAR_HEIGHT, VIEWPORT } from "./test-utils";
+import { TOP_BAR_HEIGHT, ROOT_SPACING } from "./test-utils";
 
 test.describe("Multiple DAG Layout", () => {
   test("all root nodes should be aligned at the same Y position in the top bar", async ({
@@ -14,16 +14,18 @@ test.describe("Multiple DAG Layout", () => {
     expect(initialRoots.length).toBe(1);
     expect(initialRoots[0].label).toBe("John Smith");
 
-    // Create a second root far to the right (1-level DAG - just root, no children)
-    // Specify targetX to avoid overlap with existing nodes
-    await orgChart.makeRoot("Jennifer Taylor", VIEWPORT.width - 200);
+    // Create a second root (1-level DAG - just root, no children)
+    // Position it to the right of existing roots with spacing to avoid connections
+    const johnPos = await orgChart.getNodePosition("John Smith");
+    await orgChart.makeRoot("Jennifer Taylor", johnPos.x + ROOT_SPACING);
 
     // Verify we now have 2 roots
     const rootsAfterFirst = await orgChart.getRootNodes();
     expect(rootsAfterFirst.length).toBe(2);
 
-    // Create a third root in between (also 1-level initially)
-    await orgChart.makeRoot("James Brown", VIEWPORT.width - 400);
+    // Create a third root (also 1-level initially)
+    // Position further right to avoid connecting to existing roots
+    await orgChart.makeRoot("James Brown", johnPos.x + ROOT_SPACING * 2);
 
     // Verify we now have 3 roots
     let allRoots = await orgChart.getRootNodes();
@@ -82,7 +84,9 @@ test.describe("Multiple DAG Layout", () => {
     // Level 2: Emily Davis, Robert Wilson, Lisa Anderson, David Martinez
 
     // Make Jennifer Taylor a root (will be a 1-level DAG initially)
-    await orgChart.makeRoot("Jennifer Taylor", VIEWPORT.width - 200);
+    // Position to the right of John Smith to avoid accidental connections
+    const johnPos = await orgChart.getNodePosition("John Smith");
+    await orgChart.makeRoot("Jennifer Taylor", johnPos.x + ROOT_SPACING);
 
     // Connect William Lee and Amanda White under Jennifer Taylor
     // This creates a 2-level DAG
@@ -121,16 +125,17 @@ test.describe("Multiple DAG Layout", () => {
     const orgChart = new OrgChartPage(page);
     await orgChart.goto();
 
-    // Get the hierarchy nodes (connected to John Smith)
-    const hierarchyNodes = await orgChart.getNodes();
-    const connectedNodes = hierarchyNodes.filter((n) => {
-      // Nodes 1-7 are connected in the initial hierarchy
-      return ["1", "2", "3", "4", "5", "6", "7"].includes(n.id);
-    });
-
-    // Get free nodes (nodes 8-12)
-    const freeNodes = await orgChart.getFreeNodes();
+    // Get free nodes and connected nodes dynamically (no hardcoded IDs)
+    const [allNodes, freeNodes] = await Promise.all([
+      orgChart.getNodes(),
+      orgChart.getFreeNodes(),
+    ]);
     expect(freeNodes.length).toBeGreaterThan(0);
+
+    // Connected nodes are all nodes that aren't free
+    const freeNodeIds = new Set(freeNodes.map((n) => n.id));
+    const connectedNodes = allNodes.filter((n) => !freeNodeIds.has(n.id));
+    expect(connectedNodes.length).toBeGreaterThan(0);
 
     // Calculate hierarchy Y bounds (to verify free nodes are below)
     const hierarchyYs = connectedNodes.map((n) => n.position.y);
