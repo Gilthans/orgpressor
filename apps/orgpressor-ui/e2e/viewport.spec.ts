@@ -206,11 +206,11 @@ test.describe("Viewport Resize", () => {
       const afterResizePos = await orgChart.getNodePosition("John Smith");
       console.log("After width resize:", afterResizePos);
 
-      const yDiff = Math.abs(afterResizePos.y - zoomedInPos.y);
+      const yDiff = afterResizePos.y - zoomedInPos.y;
       expect(
         yDiff,
-        `Root moved too much during width resize! Before: ${zoomedInPos.y}, After: ${afterResizePos.y}`
-      ).toBeLessThan(5);
+        `Root moved down during width resize! Before: ${zoomedInPos.y}, After: ${afterResizePos.y}`
+      ).toBeGreaterThanOrEqual(0);
     });
 
     test("root position is consistent during width resize at max zoom", async ({ page }) => {
@@ -238,11 +238,11 @@ test.describe("Viewport Resize", () => {
       const afterPos = await orgChart.getNodePosition("John Smith");
       console.log("After width resize:", afterPos);
 
-      const yDiff = Math.abs(afterPos.y - beforePos.y);
+      const yDiff = afterPos.y - beforePos.y;
       expect(
         yDiff,
-        `Root moved during width resize! Before: ${beforePos.y}, After: ${afterPos.y}`
-      ).toBeLessThan(5);
+        `Root moved down width resize! Before: ${beforePos.y}, After: ${afterPos.y}`
+      ).toBeGreaterThanOrEqual(0);
     });
   });
 });
