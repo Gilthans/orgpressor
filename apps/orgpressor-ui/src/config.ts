@@ -48,6 +48,7 @@ export const networkOptions: Options = {
       sortMethod: "directed",
       levelSeparation: LEVEL_SEPARATION,
       nodeSpacing: NODE_SPACING,
+      shakeTowards: "roots"
     },
   },
   nodes: {

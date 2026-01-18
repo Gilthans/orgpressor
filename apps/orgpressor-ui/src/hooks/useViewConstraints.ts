@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
-import type { Network, DataSet } from "vis-network/standalone";
-import type { VisNode, VisEdge } from "../types";
-import { ROOT_Y_IN_TOP_BAR } from "../config";
-import { findRootNodesMinY } from "../utils/network";
+import type { Network } from "vis-network/standalone";
+import { getNetworkContainer } from "../utils/network";
+
+interface ViewBounds {
+  minY?: number; // Minimum Y in canvas coordinates (can't pan above this)
+}
 
 interface UseViewConstraintsProps {
   network: Network | null;
-  nodesDataSet: DataSet<VisNode>;
-  edgesDataSet: DataSet<VisEdge>;
+  /** Returns the current view bounds. Called during pan/zoom to get up-to-date constraints. */
+  getViewBounds: (scale: number) => ViewBounds;
   onScaleChange?: (scale: number) => void;
 }
 
@@ -16,17 +18,18 @@ const MAX_SCALE = 2;
 const ZOOM_SPEED = 0.001;
 
 /**
- * Manages view constraints: zoom, pan, and resize handling.
+ * Enforces view constraints for pan and zoom operations.
+ * This hook is generic - it knows nothing about nodes or graph structure.
+ * It simply enforces the bounds provided by getViewBounds.
  *
- * Key invariants:
- * - User's zoom level (scale) is preserved across viewport resizes
- * - Roots stay at ROOT_Y_IN_TOP_BAR in DOM coordinates when at top limit
- * - Y-axis panning is allowed but clamped so you can't scroll past the top bar
+ * Key behaviors:
+ * - Custom panning: X is free, Y is clamped by minY
+ * - Custom zooming: Keeps top of view fixed, respects minY constraint
+ * - Resize handling: Preserves user's intended scale
  */
 export function useViewConstraints({
   network,
-  nodesDataSet,
-  edgesDataSet,
+  getViewBounds,
   onScaleChange,
 }: UseViewConstraintsProps): void {
   const isDragging = useRef(false);
@@ -39,28 +42,18 @@ export function useViewConstraints({
   useEffect(() => {
     if (!network) return;
 
-    const container = (network as unknown as { body: { container: HTMLElement } }).body.container;
+    const container = getNetworkContainer(network);
 
     // Initialize intended scale
     intendedScale.current = network.getScale();
     onScaleChange?.(intendedScale.current);
 
     /**
-     * Calculate the minimum viewY that keeps roots at the top bar position.
-     * This is the "ceiling" - you can scroll down but not up past this point.
-     * @param scale - Optional scale to use (defaults to current network scale)
+     * Get the minimum viewY that respects the bounds constraint.
      */
-    const getMinViewY = (scale?: number): number => {
-      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet);
-      if (rootMinY === undefined) return -Infinity; // No roots, no constraint
-
-      const effectiveScale = scale ?? network.getScale();
-      const containerHeight = container.clientHeight;
-
-      // Calculate viewY where roots appear at ROOT_Y_IN_TOP_BAR from top
-      // Formula: domY = containerHeight/2 + (canvasY - viewY) * scale
-      // Solving for viewY when domY = ROOT_Y_IN_TOP_BAR and canvasY = rootMinY
-      return rootMinY - (ROOT_Y_IN_TOP_BAR - containerHeight / 2) / effectiveScale;
+    const getMinViewY = (scale: number): number => {
+      const bounds = getViewBounds(scale);
+      return bounds.minY ?? -Infinity;
     };
 
     // --- Panning (X free, Y clamped at top) ---
@@ -85,9 +78,9 @@ export function useViewConstraints({
       const currentPos = network.getViewPosition();
       const scale = network.getScale();
 
-      // Calculate new Y position and clamp to minimum (can't scroll past roots)
+      // Calculate new Y position and clamp to minimum
       const newY = currentPos.y - deltaY / scale;
-      const minViewY = getMinViewY();
+      const minViewY = getMinViewY(scale);
       const clampedY = Math.max(minViewY, newY);
 
       network.moveTo({
@@ -139,7 +132,7 @@ export function useViewConstraints({
         const topY = currentPos.y - containerHeight / 2 / currentScale;
         newViewY = topY + containerHeight / 2 / newScale;
 
-        // Still clamp to minimum viewY (can't scroll past roots)
+        // Still clamp to minimum viewY
         const minViewY = getMinViewY(newScale);
         newViewY = Math.max(minViewY, newViewY);
       }
@@ -177,8 +170,7 @@ export function useViewConstraints({
       // Redraw canvas for new dimensions
       network.redraw();
 
-      // Restore user's intended scale and position roots at the top
-      // Use getMinViewY to calculate correct position (roots at ROOT_Y_IN_TOP_BAR)
+      // Restore user's intended scale and respect minY constraint
       const minViewY = getMinViewY(intendedScale.current);
 
       network.moveTo({
@@ -208,5 +200,5 @@ export function useViewConstraints({
       container.removeEventListener("wheel", handleWheel);
       resizeObserver.disconnect();
     };
-  }, [network, nodesDataSet, edgesDataSet, onScaleChange]);
+  }, [network, getViewBounds, onScaleChange]);
 }

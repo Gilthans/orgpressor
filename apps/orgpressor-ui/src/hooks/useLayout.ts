@@ -8,7 +8,7 @@ import {
   ROOT_Y_IN_TOP_BAR,
 } from "../config";
 import { getRootNodeIds, getAllDescendantIds } from "../utils/hierarchy";
-import { getNetworkContainer, domToCanvasY, positionViewForRoots } from "../utils/network";
+import { domToCanvasY } from "../utils/network";
 
 /**
  * Calculate optimal grid dimensions for free nodes.
@@ -54,8 +54,6 @@ export function useLayout({
 }: UseLayoutProps): void {
   useEffect(() => {
     if (!network) return;
-
-    const container = getNetworkContainer(network);
 
     const arrangeNodes = () => {
       const allNodes = nodesDataSet.get();
@@ -186,41 +184,8 @@ export function useLayout({
         });
       });
 
-      // Apply all updates
+      // Apply all updates (view positioning is handled by useViewConstraints)
       nodesDataSet.update([...connectedUpdates, ...freeUpdates]);
-
-      // Move view to show roots at top
-      setTimeout(() => {
-        const updatedPositions = network.getPositions();
-
-        // Find the new bounds
-        let minX = Infinity;
-        let maxX = -Infinity;
-
-        allNodes.forEach((node) => {
-          const pos = updatedPositions[node.id];
-          if (pos) {
-            if (pos.x < minX) minX = pos.x;
-            if (pos.x > maxX) maxX = pos.x;
-          }
-        });
-
-        const centerX = (minX + maxX) / 2;
-        const containerWidth = container.clientWidth;
-
-        // Calculate scale to fit width
-        const newScale = Math.min(1, containerWidth / (maxX - minX + 200));
-
-        // First set the scale and center X
-        network.moveTo({
-          position: { x: centerX, y: network.getViewPosition().y },
-          scale: newScale,
-          animation: false,
-        });
-
-        // Then position view so roots appear in the top bar (accounts for scale)
-        positionViewForRoots(network, nodesDataSet, edgesDataSet, { animate: false });
-      }, 50);
     };
 
     // Wait for hierarchical layout to complete, then arrange free nodes

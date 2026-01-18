@@ -9,6 +9,7 @@ vi.mock("../hooks", () => ({
   useLayout: vi.fn(),
   useNodeDrag: vi.fn(),
   useViewConstraints: vi.fn(),
+  useInitialViewPosition: vi.fn(),
   useCanvasTopBar: vi.fn(),
 }));
 
