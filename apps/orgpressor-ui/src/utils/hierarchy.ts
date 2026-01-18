@@ -72,7 +72,6 @@ export function validateNoCycles(edges: HierarchyEdge[]): void {
 
 /**
  * Get IDs of nodes that are part of the hierarchy (have edges or are roots).
- * Excludes the special top bar node.
  */
 export function getSnappedNodeIds(
   nodesDataSet: DataSet<VisNode>,

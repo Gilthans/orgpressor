@@ -1,8 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { Network, DataSet } from "vis-network/standalone";
 import type { VisNode, VisEdge } from "../types";
-import { ROOT_Y_IN_TOP_BAR } from "../config";
-import { findRootNodesMinY, getNetworkContainer } from "../utils/network";
+import {
+  ROOT_Y_IN_TOP_BAR,
+  FREE_NODES_TOP_MARGIN,
+  FREE_NODES_SPACING,
+} from "../config";
+import { domToCanvasY, getNetworkContainer } from "../utils/network";
+import { LayoutCalculator } from "../utils/layout";
 
 interface UseInitialViewPositionProps {
   network: Network | null;
@@ -33,49 +38,38 @@ export function useInitialViewPosition({
 
     const container = getNetworkContainer(network);
 
-    /**
-     * Calculate the viewY that positions roots at ROOT_Y_IN_TOP_BAR from top.
-     */
-    const calculateViewYForRoots = (scale: number): number => {
-      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet);
-      if (rootMinY === undefined) return 0;
-
-      const containerHeight = container.clientHeight;
-      // Formula: viewY where roots appear at ROOT_Y_IN_TOP_BAR from top
-      return rootMinY - (ROOT_Y_IN_TOP_BAR - containerHeight / 2) / scale;
-    };
-
-    /**
-     * Position the view so roots appear at the correct position.
-     * Calculates scale to fit content width.
-     */
     const positionView = () => {
-      const allNodes = nodesDataSet.get();
+      const nodes = nodesDataSet.get();
+      const edges = edgesDataSet.get();
+
+      if (nodes.length === 0) return;
+
+      // Get current positions (already arranged by useLayout)
       const positions = network.getPositions();
 
-      // Find X bounds
-      let minX = Infinity;
-      let maxX = -Infinity;
+      // Calculate target Y for roots (in canvas coordinates)
+      const targetRootY = domToCanvasY(network, ROOT_Y_IN_TOP_BAR);
 
-      allNodes.forEach((node) => {
-        const pos = positions[node.id];
-        if (pos) {
-          if (pos.x < minX) minX = pos.x;
-          if (pos.x > maxX) maxX = pos.x;
-        }
+      // Create calculator to get bounds
+      const calculator = new LayoutCalculator({
+        targetRootY,
+        freeNodesTopMargin: FREE_NODES_TOP_MARGIN,
+        freeNodesSpacing: FREE_NODES_SPACING,
       });
 
-      if (minX === Infinity) return; // No nodes
-
-      const centerX = (minX + maxX) / 2;
+      const layout = calculator.calculate({ nodes, edges, positions });
+      const { bounds } = layout;
+      const centerX = (bounds.minX + bounds.maxX) / 2;
 
       // Calculate scale to fit width
       const containerWidth = container.clientWidth;
-      let newScale = Math.min(1, containerWidth / (maxX - minX + 200));
+      const containerHeight = container.clientHeight;
+      const contentWidth = bounds.maxX - bounds.minX + 200;
+      let newScale = Math.min(1, containerWidth / contentWidth);
       newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
 
-      // Position view with roots at top
-      const viewY = calculateViewYForRoots(newScale);
+      // Calculate viewY so roots appear at ROOT_Y_IN_TOP_BAR from viewport top
+      const viewY = bounds.minY - (ROOT_Y_IN_TOP_BAR - containerHeight / 2) / newScale;
 
       network.moveTo({
         position: { x: centerX, y: viewY },
@@ -90,7 +84,7 @@ export function useInitialViewPosition({
       if (isInitialized.current) return;
       isInitialized.current = true;
 
-      // Small delay to ensure all node positions are finalized
+      // Small delay to ensure useLayout has applied positions
       setTimeout(positionView, 50);
     };
 

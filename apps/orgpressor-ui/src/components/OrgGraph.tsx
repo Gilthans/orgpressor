@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { networkOptions } from "../config";
 import { useVisNetwork, useLayout, useViewConstraints, useInitialViewPosition } from "../hooks";
-import { extractGraphState } from "../utils";
+import { extractGraphState, validateNoCycles } from "../utils";
 import { HierarchicalNetworkEditor } from "./HierarchicalNetworkEditor";
 
 
@@ -72,6 +72,9 @@ export function OrgGraph({
   onReady
 }: OrgGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Validate that edges form a valid DAG (no cycles)
+  validateNoCycles(edges);
 
   const { network, nodesDataSet, edgesDataSet } = useVisNetwork({
     containerRef,

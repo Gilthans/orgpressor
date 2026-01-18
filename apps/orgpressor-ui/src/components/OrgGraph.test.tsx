@@ -242,4 +242,63 @@ describe("OrgGraph", () => {
       });
     });
   });
+
+  describe("cycle detection", () => {
+    it("throws an error when edges form a simple cycle", () => {
+      const cyclicEdges = [
+        { from: "1", to: "2" },
+        { from: "2", to: "1" }, // Creates cycle: 1 -> 2 -> 1
+      ];
+
+      expect(() =>
+        render(<OrgGraph nodes={defaultNodes} edges={cyclicEdges} />)
+      ).toThrow(/cycle/i);
+    });
+
+    it("throws an error when edges form a longer cycle", () => {
+      const nodesForCycle = [
+        { id: "1", label: "Node 1" },
+        { id: "2", label: "Node 2" },
+        { id: "3", label: "Node 3" },
+      ];
+
+      const cyclicEdges = [
+        { from: "1", to: "2" },
+        { from: "2", to: "3" },
+        { from: "3", to: "1" }, // Creates cycle: 1 -> 2 -> 3 -> 1
+      ];
+
+      expect(() =>
+        render(<OrgGraph nodes={nodesForCycle} edges={cyclicEdges} />)
+      ).toThrow(/cycle/i);
+    });
+
+    it("throws an error for self-referencing edge", () => {
+      const selfRefEdges = [
+        { from: "1", to: "1" }, // Self-loop
+      ];
+
+      expect(() =>
+        render(<OrgGraph nodes={defaultNodes} edges={selfRefEdges} />)
+      ).toThrow(/cycle/i);
+    });
+
+    it("does not throw for valid DAG edges", () => {
+      const dagEdges = [
+        { from: "1", to: "2" },
+        { from: "1", to: "3" },
+        { from: "2", to: "3" }, // Diamond shape - valid DAG
+      ];
+
+      const nodesForDag = [
+        { id: "1", label: "Node 1" },
+        { id: "2", label: "Node 2" },
+        { id: "3", label: "Node 3" },
+      ];
+
+      expect(() =>
+        render(<OrgGraph nodes={nodesForDag} edges={dagEdges} />)
+      ).not.toThrow();
+    });
+  });
 });
