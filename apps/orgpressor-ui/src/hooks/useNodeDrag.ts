@@ -7,7 +7,9 @@ import {
   SNAP_OUT_THRESHOLD,
   HIGHLIGHT_COLOR,
   DEFAULT_NODE_COLOR,
+  TOP_BAR_NODE_ID,
   TOP_BAR_HEIGHT,
+  ROOT_Y_IN_TOP_BAR,
   LEVEL_SEPARATION,
   NODE_SPACING,
 } from "../config";
@@ -23,7 +25,7 @@ import {
   createPositionUpdates,
   boxesOverlap,
 } from "../utils/positions";
-import { canvasToDOMY, domToCanvasY } from "../utils/network";
+import { domToCanvasY, findRootNodesMinY } from "../utils/network";
 import {
   captureSubtree,
   createSubtreeMoveUpdates,
@@ -34,7 +36,6 @@ interface UseNodeDragProps {
   network: Network | null;
   nodesDataSet: DataSet<VisNode>;
   edgesDataSet: DataSet<VisEdge>;
-  scale: number;
   onTopBarHighlight?: (highlighted: boolean) => void;
   onHierarchyChange?: () => void;
 }
@@ -179,7 +180,6 @@ export function useNodeDrag({
   network,
   nodesDataSet,
   edgesDataSet,
-  scale,
   onTopBarHighlight,
   onHierarchyChange,
 }: UseNodeDragProps): void {
@@ -192,6 +192,9 @@ export function useNodeDrag({
       if (params.nodes.length !== 1) return;
 
       const nodeId = params.nodes[0] as string;
+
+      // Skip the top bar node - it should not be draggable
+      if (nodeId === TOP_BAR_NODE_ID) return;
       const isFree = isNodeFree(nodeId, nodesDataSet, edgesDataSet);
       const subtree = captureSubtree(network, edgesDataSet, nodeId);
       const positions = network.getPositions([nodeId]);
@@ -299,13 +302,12 @@ export function useNodeDrag({
         return;
       }
 
-      // No node overlap - check if over top bar zone
+      // No node overlap - check if over top bar zone using coordinates
       // Use node's bounding box TOP edge, not center, so highlight triggers on intersection
-      // Account for view scale since TopBar height is scaled
       const nodeTopEdgeY = draggedBox.top;
-      const topEdgeDomY = canvasToDOMY(network, nodeTopEdgeY);
-      const scaledTopBarHeight = TOP_BAR_HEIGHT * scale;
-      const isOverTopBar = topEdgeDomY < scaledTopBarHeight;
+      const rootMinY = findRootNodesMinY(network, nodesDataSet, edgesDataSet) ?? 0;
+      const topBarBottom = rootMinY + (TOP_BAR_HEIGHT - ROOT_Y_IN_TOP_BAR);
+      const isOverTopBar = nodeTopEdgeY < topBarBottom;
 
       if (isOverTopBar !== dragState.current!.isOverTopBar) {
         dragState.current!.isOverTopBar = isOverTopBar;
@@ -439,5 +441,5 @@ export function useNodeDrag({
       network.off("dragging", handleDragging);
       network.off("dragEnd", handleDragEnd);
     };
-  }, [network, nodesDataSet, edgesDataSet, scale, onTopBarHighlight, onHierarchyChange]);
+  }, [network, nodesDataSet, edgesDataSet, onTopBarHighlight, onHierarchyChange]);
 }

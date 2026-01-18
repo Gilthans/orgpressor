@@ -12,10 +12,9 @@ import type {
   NodeStateInfo,
   EdgeStateInfo,
 } from "../types";
-import { networkOptions } from "../config";
-import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints } from "../hooks";
+import { networkOptions, TOP_BAR_NODE_ID } from "../config";
+import { useVisNetwork, useNodeDrag, useLayout, useViewConstraints, useCanvasTopBar } from "../hooks";
 import { extractGraphState } from "../utils/graphState";
-import { TopBar } from "./TopBar";
 import { EditNodeDialog } from "./EditNodeDialog";
 
 
@@ -29,7 +28,7 @@ function createGraphAccessor(
 ): GraphAccessor {
   return {
     getNodes(): NodeStateInfo[] {
-      const nodes = nodesDataSet.get();
+      const nodes = nodesDataSet.get().filter((node) => node.id !== TOP_BAR_NODE_ID);
       const positions = network.getPositions();
 
       return nodes.map((node) => {
@@ -45,12 +44,15 @@ function createGraphAccessor(
     },
 
     getEdges(): EdgeStateInfo[] {
-      return edgesDataSet.get().map((edge) => ({
-        id: edge.id,
-        from: edge.from,
-        to: edge.to,
-        dashes: edge.dashes || false,
-      }));
+      return edgesDataSet
+        .get()
+        .filter((edge) => edge.from !== TOP_BAR_NODE_ID && edge.to !== TOP_BAR_NODE_ID)
+        .map((edge) => ({
+          id: edge.id,
+          from: edge.from,
+          to: edge.to,
+          dashes: edge.dashes || false,
+        }));
     },
   };
 }
@@ -75,7 +77,6 @@ export function OrgGraph({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTopBarHighlighted, setIsTopBarHighlighted] = useState(false);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
 
   const { network, nodesDataSet, edgesDataSet } = useVisNetwork({
     containerRef,
@@ -104,7 +105,6 @@ export function OrgGraph({
     network,
     nodesDataSet,
     edgesDataSet,
-    scale,
     onTopBarHighlight: handleTopBarHighlight,
     onHierarchyChange: notifyChange,
   });
@@ -113,7 +113,13 @@ export function OrgGraph({
     network,
     nodesDataSet,
     edgesDataSet,
-    onScaleChange: setScale,
+  });
+
+  useCanvasTopBar({
+    network,
+    nodesDataSet,
+    edgesDataSet,
+    isHighlighted: isTopBarHighlighted,
   });
 
   // Handle double-click to edit node metadata
@@ -122,7 +128,11 @@ export function OrgGraph({
 
     const handleDoubleClick = (params: { nodes: (string | number)[] }) => {
       if (params.nodes.length === 1) {
-        setEditingNodeId(params.nodes[0] as string);
+        const nodeId = params.nodes[0] as string;
+        // Don't allow editing the top bar node
+        if (nodeId !== TOP_BAR_NODE_ID) {
+          setEditingNodeId(nodeId);
+        }
       }
     };
 
@@ -137,7 +147,9 @@ export function OrgGraph({
     if (!network) return;
 
     const handleClick = (params: { nodes: (string | number)[] }) => {
-      const newSelectedId = params.nodes.length === 1 ? (params.nodes[0] as string) : null;
+      const clickedNodeId = params.nodes.length === 1 ? (params.nodes[0] as string) : null;
+      // Don't report selection of the top bar node
+      const newSelectedId = clickedNodeId === TOP_BAR_NODE_ID ? null : clickedNodeId;
       onSelectedNodeChange?.(newSelectedId);
     };
 
@@ -198,8 +210,7 @@ export function OrgGraph({
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <TopBar isHighlighted={isTopBarHighlighted} scale={scale} />
-      <div ref={containerRef} style={{ position: "relative", zIndex: 1, width: "100%", height: "100%" }} />
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
       {editingNode && (
         <EditNodeDialog
           nodeName={editingNode.name}

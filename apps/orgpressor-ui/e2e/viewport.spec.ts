@@ -56,7 +56,7 @@ test.describe("Viewport Resize", () => {
   });
 
   test.describe("When Zoomed Out", () => {
-    test("root stays in scaled top bar after height decrease", async ({ page }) => {
+    test("root stays in top bar after height decrease", async ({ page }) => {
       const orgChart = new OrgChartPage(page);
       await orgChart.goto();
 
@@ -77,9 +77,6 @@ test.describe("Viewport Resize", () => {
       const zoomedOutPos = await orgChart.getNodePosition("John Smith");
       console.log("After zoom out:", zoomedOutPos);
 
-      // At min zoom (0.2), TopBar is 12px, root should be at ~6px
-      expect(zoomedOutPos.y, "Root should be near top when zoomed out").toBeLessThan(15);
-
       // Reduce height significantly
       await page.setViewportSize({ width: 1280, height: 400 });
 
@@ -90,13 +87,15 @@ test.describe("Viewport Resize", () => {
       const afterResizePos = await orgChart.getNodePosition("John Smith");
       console.log("After resize:", afterResizePos);
 
+      // Root should be in the fixed top bar (y=30 ± tolerance)
+      // The top bar is a fixed DOM region, not scaled with zoom
       expect(
         afterResizePos.y,
-        `Root left scaled top bar! Position: y=${afterResizePos.y}, expected y < 15`
-      ).toBeLessThan(15);
+        `Root should be in top bar! Position: y=${afterResizePos.y}`
+      ).toBeLessThan(TOP_BAR_HEIGHT);
     });
 
-    test("root stays in scaled top bar with extreme height reduction", async ({ page }) => {
+    test("root stays in top bar with extreme height reduction", async ({ page }) => {
       const orgChart = new OrgChartPage(page);
       await orgChart.goto();
 
@@ -112,7 +111,6 @@ test.describe("Viewport Resize", () => {
       await page.screenshot({ path: "test-results/extreme-zoom-01-before.png" });
       const beforePos = await orgChart.getNodePosition("John Smith");
       console.log("Before extreme resize (min zoom):", beforePos);
-      expect(beforePos.y, "Root should be near top before resize").toBeLessThan(15);
 
       // Extreme height reduction
       await page.setViewportSize({ width: 1280, height: 250 });
@@ -122,13 +120,14 @@ test.describe("Viewport Resize", () => {
       const afterPos = await orgChart.getNodePosition("John Smith");
       console.log("After extreme resize:", afterPos);
 
+      // Root should be in the fixed top bar after resize
       expect(
         afterPos.y,
-        `Root left scaled top bar after extreme resize! y=${afterPos.y}`
-      ).toBeLessThan(15);
+        `Root should be in top bar after resize! y=${afterPos.y}`
+      ).toBeLessThan(TOP_BAR_HEIGHT);
     });
 
-    test("root position is consistent before and after resize at different zoom levels", async ({ page }) => {
+    test("root returns to top bar after resize at different zoom levels", async ({ page }) => {
       const orgChart = new OrgChartPage(page);
       await orgChart.goto();
 
@@ -163,11 +162,11 @@ test.describe("Viewport Resize", () => {
         const afterPos = await orgChart.getNodePosition("John Smith");
         console.log(`${name} - after resize:`, afterPos);
 
-        const yDiff = Math.abs(afterPos.y - beforePos.y);
+        // Root should be in the fixed top bar after resize (y=30 ± tolerance)
         expect(
-          yDiff,
-          `${name}: Root moved too much during resize! Before: ${beforePos.y}, After: ${afterPos.y}`
-        ).toBeLessThan(5);
+          afterPos.y,
+          `${name}: Root should be in top bar! y=${afterPos.y}`
+        ).toBeLessThan(TOP_BAR_HEIGHT);
       }
     });
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { OrgGraph } from "./OrgGraph";
 import * as hooks from "../hooks";
 
@@ -9,6 +9,7 @@ vi.mock("../hooks", () => ({
   useLayout: vi.fn(),
   useNodeDrag: vi.fn(),
   useViewConstraints: vi.fn(),
+  useCanvasTopBar: vi.fn(),
 }));
 
 describe("OrgGraph", () => {
@@ -59,26 +60,29 @@ describe("OrgGraph", () => {
   });
 
   describe("rendering", () => {
-    it("renders the container and top bar", () => {
-      render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} />);
-      expect(screen.getByTestId("top-bar")).toBeInTheDocument();
+    it("renders the container", () => {
+      const { container } = render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} />);
+      expect(container.querySelector("div")).toBeInTheDocument();
     });
 
     it("accepts onChange prop without error", () => {
       const onChange = vi.fn();
-      render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} onChange={onChange} />);
-      expect(screen.getByTestId("top-bar")).toBeInTheDocument();
+      expect(() => {
+        render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} onChange={onChange} />);
+      }).not.toThrow();
     });
 
     it("accepts selectedNodeId prop without error", () => {
-      render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} selectedNodeId="1" />);
-      expect(screen.getByTestId("top-bar")).toBeInTheDocument();
+      expect(() => {
+        render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} selectedNodeId="1" />);
+      }).not.toThrow();
     });
 
     it("accepts onSelectedNodeChange prop without error", () => {
       const onSelectedNodeChange = vi.fn();
-      render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} onSelectedNodeChange={onSelectedNodeChange} />);
-      expect(screen.getByTestId("top-bar")).toBeInTheDocument();
+      expect(() => {
+        render(<OrgGraph nodes={defaultNodes} edges={defaultEdges} onSelectedNodeChange={onSelectedNodeChange} />);
+      }).not.toThrow();
     });
   });
 

@@ -1,5 +1,6 @@
 import type { DataSet } from "vis-network/standalone";
 import type { VisNode, VisEdge, HierarchyEdge } from "../types";
+import { TOP_BAR_NODE_ID } from "../config";
 
 /**
  * Detects if the given edges form a cycle (not a valid DAG).
@@ -71,7 +72,8 @@ export function validateNoCycles(edges: HierarchyEdge[]): void {
 }
 
 /**
- * Get IDs of nodes that are part of the hierarchy (have edges or are roots)
+ * Get IDs of nodes that are part of the hierarchy (have edges or are roots).
+ * Excludes the special top bar node.
  */
 export function getSnappedNodeIds(
   nodesDataSet: DataSet<VisNode>,
@@ -81,13 +83,13 @@ export function getSnappedNodeIds(
 
   // Add nodes with edges
   edgesDataSet.get().forEach((edge) => {
-    snappedIds.add(edge.from);
-    snappedIds.add(edge.to);
+    if (edge.from !== TOP_BAR_NODE_ID) snappedIds.add(edge.from);
+    if (edge.to !== TOP_BAR_NODE_ID) snappedIds.add(edge.to);
   });
 
   // Add root nodes (even if they have no edges)
   nodesDataSet.get().forEach((node) => {
-    if (node.isRoot) {
+    if (node.isRoot && node.id !== TOP_BAR_NODE_ID) {
       snappedIds.add(node.id);
     }
   });
