@@ -97,13 +97,10 @@ function handleCreateRoot(
   const { subtree } = dragState;
   const positions = captureAllPositions(network, nodesDataSet);
   const existingRoots = nodesDataSet.get().filter((n) => n.isRoot);
-  const existingRootIds = existingRoots.map((r) => r.id);
 
-  // Calculate X position: to the right of existing roots
-  let newRootX = 0;
-  if (existingRoots.length > 0) {
-    newRootX = findRightmostX(existingRootIds, positions) + NODE_SPACING;
-  }
+  // Keep current X position - don't move horizontally when becoming a root
+  const currentPos = positions[subtree.rootId];
+  const newRootX = currentPos?.x ?? 0;
 
   // Calculate Y position: same as existing roots, or centered in top bar
   let rootY = 0;
